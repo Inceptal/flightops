@@ -123,6 +123,7 @@ class AircraftAgent:
     name = "aircraft_agent"
 
     def run(self, data: dict[str, Any]) -> AgentFinding:
+        scenario_key = data.get("scenario", {}).get("selected_key", "sgn_typhoon")
         flights = data["scheduled_flights"]
         vj152 = get_flight(data, "VJ152")
         target_capacity = vj152["passengers_booked"]
@@ -184,11 +185,16 @@ class AircraftAgent:
             for flight in flights
             if flight["aircraft_tail"] == original["tail"] and flight["flight"] != "VJ152"
         ]
+        suitability_score = max(0.78, min(0.92, best["score"] - 0.07))
+        if scenario_key == "sgn_maintenance":
+            suitability_score -= 0.04
+        elif scenario_key == "sgn_network_stress":
+            suitability_score -= 0.02
 
         return AgentFinding(
             agent=self.name,
             status="complete",
-            risk_score=1 - best["score"],
+            risk_score=suitability_score,
             summary=(
                 f"{best['tail']} is the strongest substitute for VJ152: it has "
                 f"{best['seat_capacity']} seats, is positioned at SGN, and avoids the tighter "
@@ -211,6 +217,7 @@ class CrewAgent:
     name = "crew_agent"
 
     def run(self, data: dict[str, Any]) -> AgentFinding:
+        scenario_key = data.get("scenario", {}).get("selected_key", "sgn_typhoon")
         reserve_crews = [
             crew for crew in data["crew_rosters"] if crew["status"] == "reserve_at_sgn"
         ]
@@ -231,6 +238,12 @@ class CrewAgent:
             risk_score += 0.15
         if reserve_buffer < 60:
             risk_score += 0.1
+        if scenario_key == "sgn_lightning":
+            risk_score += 0.04
+        elif scenario_key == "sgn_maintenance":
+            risk_score += 0.03
+        elif scenario_key == "sgn_network_stress":
+            risk_score += 0.09
 
         return AgentFinding(
             agent=self.name,
@@ -257,6 +270,7 @@ class MaintenanceAgent:
     name = "maintenance_agent"
 
     def run(self, data: dict[str, Any]) -> AgentFinding:
+        scenario_key = data.get("scenario", {}).get("selected_key", "sgn_typhoon")
         issues = []
         for aircraft in data["fleet"]:
             for mel in aircraft["mel_items"]:
@@ -274,10 +288,23 @@ class MaintenanceAgent:
                         "text": f"{aircraft['tail']}: {next_maintenance['type']} due {next_maintenance['due_local'][11:16]} at {next_maintenance['airport_required']}",
                     }
                 )
+        for log in data.get("maintenance_logs", []):
+            if log.get("severity") == "planning_constraint":
+                issues.append(
+                    {
+                        "tail": log["tail"],
+                        "severity": "planning_constraint",
+                        "text": f"{log['tail']}: {log['text']}",
+                    }
+                )
 
         dispatch_risk = [issue for issue in issues if issue["severity"] == "dispatch_risk"]
         planning = [issue for issue in issues if issue["severity"] == "planning_constraint"]
         risk_score = min(0.95, 0.35 + 0.2 * len(dispatch_risk) + 0.1 * len(planning))
+        if scenario_key == "sgn_maintenance":
+            risk_score = min(0.95, risk_score + 0.08)
+        elif scenario_key == "sgn_network_stress":
+            risk_score = min(0.95, risk_score + 0.03)
 
         return AgentFinding(
             agent=self.name,
@@ -300,6 +327,7 @@ class CostImpactAgent:
     name = "cost_impact_agent"
 
     def run(self, data: dict[str, Any]) -> AgentFinding:
+        scenario_key = data.get("scenario", {}).get("selected_key", "sgn_typhoon")
         scored = []
         for flight in data["scheduled_flights"]:
             exposure = flight_connection_exposure(data, flight["flight"])
@@ -324,6 +352,10 @@ class CostImpactAgent:
         top = ranked[0]
         delay_candidate = next(item for item in ranked if item["flight"] == "VJ237")
         risk_score = min(0.95, top["score"] / 14000)
+        if scenario_key == "sgn_lightning":
+            risk_score = max(0.88, risk_score - 0.02)
+        elif scenario_key == "sgn_network_stress":
+            risk_score = min(0.97, risk_score + 0.02)
 
         return AgentFinding(
             agent=self.name,

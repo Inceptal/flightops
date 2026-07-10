@@ -61,6 +61,29 @@ class ScenarioVariantTests(unittest.TestCase):
         self.assertIn("SGN Capacity Compression Window", storm_names)
         self.assertIn("SGN Heat And Convective Recovery Window", storm_names)
 
+    def test_agent_scores_are_demo_plausible_across_scenarios(self) -> None:
+        for scenario_key in SCENARIO_OPTIONS:
+            with self.subTest(scenario_key=scenario_key):
+                decision = run_agents(load_scenario(scenario_key))
+                scores = {
+                    finding["agent"]: finding["risk_score"]
+                    for finding in decision["agent_findings"]
+                }
+                self.assertGreaterEqual(scores["aircraft_agent"], 0.75)
+                self.assertGreaterEqual(scores["crew_agent"], 0.6)
+                self.assertGreaterEqual(scores["maintenance_agent"], 0.6)
+                self.assertGreaterEqual(scores["cost_impact_agent"], 0.85)
+
+    def test_agent_score_profiles_vary_by_scenario(self) -> None:
+        profiles = {
+            scenario_key: tuple(
+                finding["risk_score"]
+                for finding in run_agents(load_scenario(scenario_key))["agent_findings"]
+            )
+            for scenario_key in SCENARIO_OPTIONS
+        }
+        self.assertEqual(len(set(profiles.values())), len(SCENARIO_OPTIONS))
+
 
 if __name__ == "__main__":
     unittest.main()
