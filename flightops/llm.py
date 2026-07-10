@@ -42,7 +42,7 @@ class LLMExplanationAgent:
         if not self._bedrock_configured():
             return self._fallback(evidence_bundle, "AWS Bedrock environment is not configured.")
 
-        model_id = os.getenv("BEDROCK_MODEL_ID", DEFAULT_BEDROCK_MODEL_ID)
+        model_id = os.getenv("BEDROCK_MODEL_ID") or os.getenv("ANTHROPIC_MODEL") or DEFAULT_BEDROCK_MODEL_ID
         region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
 
         try:
@@ -92,7 +92,8 @@ class LLMExplanationAgent:
         has_region = bool(os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION"))
         has_profile = bool(os.getenv("AWS_PROFILE"))
         has_keys = bool(os.getenv("AWS_ACCESS_KEY_ID") and os.getenv("AWS_SECRET_ACCESS_KEY"))
-        return has_region and (has_profile or has_keys)
+        has_bedrock_api_key = bool(os.getenv("AWS_BEARER_TOKEN_BEDROCK"))
+        return has_region and (has_profile or has_keys or has_bedrock_api_key)
 
     def _fallback(self, evidence_bundle: dict[str, Any], error: str | None = None) -> LLMBriefing:
         actions = evidence_bundle["recommended_actions"]
