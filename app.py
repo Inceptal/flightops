@@ -42,13 +42,15 @@ AGENT_ACCENTS = {
     "crew_agent": "purple",
     "maintenance_agent": "amber",
     "cost_impact_agent": "green",
+    "supervisor_agent": "blue",
 }
-AGENT_ICONS = {
-    "weather_agent": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 18H8.2a4.7 4.7 0 0 1-.7-9.35A6.1 6.1 0 0 1 19 11.2 3.45 3.45 0 0 1 17.5 18Z"/><path d="m13 13-2 4h3l-2 4"/></svg>',
-    "aircraft_agent": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 21 4l-7.5 18-3-7.5L3 11.5Z"/><path d="m10.5 14.5 3-3"/></svg>',
-    "crew_agent": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-8 0"/><path d="M5 21a7 7 0 0 1 14 0"/><path d="M17 7a3 3 0 0 1 3 3"/><path d="M20 21a5 5 0 0 0-3-4.6"/></svg>',
-    "maintenance_agent": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 6.3 3-3 3 3-3 3"/><path d="M17.7 9.3 9 18l-3 1 1-3 8.7-8.7"/><path d="m4 4 5 5"/></svg>',
-    "cost_impact_agent": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M17 7.5c0-1.7-2.2-3-5-3s-5 1.3-5 3 2.2 3 5 3 5 1.3 5 3-2.2 3-5 3-5-1.3-5-3"/></svg>',
+AGENT_ICON_BADGES = {
+    "weather_agent": "WX",
+    "aircraft_agent": "AC",
+    "crew_agent": "CR",
+    "maintenance_agent": "MX",
+    "cost_impact_agent": "$",
+    "supervisor_agent": "SV",
 }
 AGENT_SHORT_SUMMARIES = {
     "weather_agent": "SGN capacity drops after 08:00; peak disruption at 10:00.",
@@ -654,16 +656,11 @@ def inject_styles() -> None:
             border-radius: 7px;
             background: #eef2f7;
             color: var(--slate);
+            font-size: 0.68rem;
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: 0;
             flex: 0 0 auto;
-        }
-        .icon-badge svg {
-            width: 1.05rem;
-            height: 1.05rem;
-            fill: none;
-            stroke: currentColor;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
         }
         .icon-badge.red {
             background: #fff1f1;
@@ -1076,32 +1073,16 @@ def inject_styles() -> None:
         .event-head {
             display: flex;
             align-items: center;
-            gap: 0.34rem;
+            gap: 0.4rem;
             color: var(--text);
             font-size: 0.8rem;
             font-weight: 900;
         }
-        .event-dot {
-            width: 0.48rem;
-            height: 0.48rem;
-            border-radius: 999px;
-            background: var(--slate);
-            flex: 0 0 auto;
-        }
-        .event-dot.red {
-            background: var(--red);
-        }
-        .event-dot.blue {
-            background: var(--blue);
-        }
-        .event-dot.purple {
-            background: var(--purple);
-        }
-        .event-dot.amber {
-            background: var(--amber);
-        }
-        .event-dot.green {
-            background: var(--green);
+        .event-head .icon-badge {
+            width: 1.42rem;
+            height: 1.42rem;
+            border-radius: 6px;
+            font-size: 0.56rem;
         }
         .event-text {
             color: var(--muted);
@@ -1406,6 +1387,12 @@ def risk_pill(value: str) -> str:
     return f'<span class="pill pill-{esc(value.lower())}">{esc(value)}</span>'
 
 
+def agent_badge(agent: str) -> str:
+    accent = AGENT_ACCENTS.get(agent, "blue")
+    label = AGENT_ICON_BADGES.get(agent, "AI")
+    return f'<span class="icon-badge {esc(accent)}">{esc(label)}</span>'
+
+
 def action_title(action: dict[str, Any]) -> str:
     if action["type"] == "aircraft_swap":
         return f"Swap {action['flight']} onto {action['to_tail']}"
@@ -1440,7 +1427,7 @@ def action_dot_class(action_type: str) -> str:
     return ""
 
 
-def monitor_events(data: dict[str, Any], decision: dict[str, Any]) -> list[tuple[str, str, str, str]]:
+def monitor_events(data: dict[str, Any], decision: dict[str, Any]) -> list[tuple[str, str, str]]:
     first_action = action_title(decision["recommended_actions"][0])
     scenario_key = data["scenario"].get("selected_key", "sgn_typhoon")
     scenario_event = {
@@ -1450,15 +1437,14 @@ def monitor_events(data: dict[str, Any], decision: dict[str, Any]) -> list[tuple
         "sgn_network_stress": "Morning bank exceeds reduced SGN capacity threshold.",
     }.get(scenario_key, "Operational disruption signal detected.")
     return [
-        ("05:40", "Weather", scenario_event, "red"),
-        ("05:42", "Maintenance", "Aircraft constraints checked against storm-window dispatch.", "amber"),
-        ("05:44", "Crew", "Reserve crew coverage confirmed for the lower-cost delay candidate.", "purple"),
-        ("05:45", "Supervisor", f"Recommendation package opened: {first_action}.", "blue"),
+        ("05:40", "weather_agent", scenario_event),
+        ("05:42", "maintenance_agent", "Aircraft constraints checked against storm-window dispatch."),
+        ("05:44", "crew_agent", "Reserve crew coverage confirmed for the lower-cost delay candidate."),
+        ("05:45", "supervisor_agent", f"Recommendation package opened: {first_action}."),
         (
             "05:46",
-            "Cost",
+            "cost_impact_agent",
             f"Impact model estimates US${decision['projected_outcome']['total_estimated_savings_usd']:,} avoidable disruption.",
-            "green",
         ),
     ]
 
@@ -1618,12 +1604,12 @@ def build_dashboard_html(
         <div class="event-item">
             <div class="event-time">{esc(time)}</div>
             <div class="event-body">
-                <div class="event-head"><span class="event-dot {esc(color)}"></span>{esc(source)} Agent</div>
+                <div class="event-head">{agent_badge(agent)}{esc(AGENT_LABELS.get(agent, 'Supervisor'))} Agent</div>
                 <div class="event-text">{esc(text)}</div>
             </div>
         </div>
         """
-        for time, source, text, color in monitor_events(data, decision)
+        for time, agent, text in monitor_events(data, decision)
     )
 
     impact_rows_html = "".join(
@@ -1694,7 +1680,7 @@ def build_dashboard_html(
             f"""
             <div class="agent-card {accent}">
                 <div class="agent-head">
-                    <div class="agent-label"><span class="icon-badge {accent}">{AGENT_ICONS[agent]}</span>{esc(AGENT_LABELS[agent])}</div>
+                    <div class="agent-label">{agent_badge(agent)}{esc(AGENT_LABELS[agent])}</div>
                     <div class="risk">{risk:.0%}</div>
                 </div>
                 <div class="bar"><span style="width: {risk * 100:.0f}%"></span></div>
@@ -1722,7 +1708,7 @@ def build_dashboard_html(
     trace_html = "".join(
         f"""
         <div class="trace-item">
-            <span class="icon-badge {AGENT_ACCENTS[agent]}">{AGENT_ICONS[agent]}</span>
+            {agent_badge(agent)}
             <div>
                 <p class="trace-title">{esc(title)}</p>
                 <p class="trace-detail">{esc(detail)}</p>
@@ -1734,7 +1720,7 @@ def build_dashboard_html(
     consensus_html = "".join(
         f"""
         <div class="consensus-item">
-            <span class="icon-badge {AGENT_ACCENTS[agent]}">{AGENT_ICONS[agent]}</span>
+            {agent_badge(agent)}
             <div>
                 <p class="trace-title">{esc(title)}</p>
                 <p class="trace-detail">{esc(detail)}</p>
