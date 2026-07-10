@@ -4,6 +4,7 @@ import copy
 import html
 import json
 import base64
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -1389,7 +1390,10 @@ def build_dashboard_html(
 def render_dashboard(
     data: dict[str, Any], decision: dict[str, Any], llm_briefing: dict[str, Any]
 ) -> None:
-    st.markdown(build_dashboard_html(data, decision, llm_briefing), unsafe_allow_html=True)
+    st.markdown(
+        textwrap.dedent(build_dashboard_html(data, decision, llm_briefing)),
+        unsafe_allow_html=True,
+    )
     with st.expander("LLM evidence bundle"):
         st.caption(
             "The LLM briefing is grounded on this structured agent evidence. "
