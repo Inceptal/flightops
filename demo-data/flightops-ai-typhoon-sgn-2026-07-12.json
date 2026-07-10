@@ -1,0 +1,803 @@
+{
+  "scenario": {
+    "id": "flightops-ai-sgn-typhoon-2026-07-12-am-wave",
+    "name": "Typhoon disruption at Ho Chi Minh City",
+    "airline": {
+      "name": "Vietjet Air",
+      "iata": "VJ",
+      "icao": "VJC",
+      "callsign": "VIETJET"
+    },
+    "snapshot_time_local": "2026-07-12T05:40:00+07:00",
+    "planning_horizon_hours": 6,
+    "base_airport": "SGN",
+    "disclaimer": "Synthetic demo dataset for hackathon use. Public facts such as airport codes, runway identifiers and aircraft family/seating are grounded in public references; flight schedules, tail numbers, crew names, maintenance events, NOTAM text, weather forecast and cost values are simulated to create a realistic operations-control scenario."
+  },
+  "reference_assumptions": {
+    "airport_facts": [
+      "Tan Son Nhat International Airport uses IATA SGN and ICAO VVTS.",
+      "SGN has parallel runways 07L/25R and 07R/25L.",
+      "Domestic Vietjet operations are represented at Terminal 1 for this demo."
+    ],
+    "fleet_facts": [
+      "Vietjet narrow-body operations are represented with Airbus A320 and A321 family aircraft.",
+      "Demo seating assumes A320: 180 seats, A321: 230 seats, A321neo/ACF: 240 seats, A330-300: 377 seats."
+    ],
+    "ops_rules": {
+      "minimum_domestic_turn_minutes_a320_a321": 35,
+      "minimum_international_turn_minutes_a320_a321": 55,
+      "minimum_domestic_connect_minutes_sgn": 45,
+      "minimum_domestic_to_international_connect_minutes_sgn": 75,
+      "crew_max_duty_minutes_demo": 780,
+      "reserve_callout_minutes_sgn": 60,
+      "decision_window_minutes": 360
+    }
+  },
+  "airports": [
+    {
+      "iata": "SGN",
+      "icao": "VVTS",
+      "name": "Tan Son Nhat International Airport",
+      "city": "Ho Chi Minh City",
+      "country": "Vietnam",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "lat": 10.8189,
+      "lon": 106.6519,
+      "runways": [
+        {
+          "id": "07L/25R",
+          "length_m": 3050,
+          "surface": "concrete",
+          "status": "open"
+        },
+        {
+          "id": "07R/25L",
+          "length_m": 3828,
+          "surface": "concrete",
+          "status": "open_with_flow_restriction"
+        }
+      ],
+      "terminal_model": [
+        {
+          "terminal": "T1",
+          "use": "domestic",
+          "gates_modeled": ["10", "11", "12", "14", "16", "18", "20", "22"],
+          "remote_stands_modeled": ["R31", "R32", "R34", "R36"]
+        },
+        {
+          "terminal": "T2",
+          "use": "international",
+          "gates_modeled": ["24", "25", "26", "28", "30"]
+        }
+      ]
+    },
+    {
+      "iata": "HAN",
+      "icao": "VVNB",
+      "name": "Noi Bai International Airport",
+      "city": "Hanoi",
+      "country": "Vietnam",
+      "timezone": "Asia/Ho_Chi_Minh"
+    },
+    {
+      "iata": "DAD",
+      "icao": "VVDN",
+      "name": "Da Nang International Airport",
+      "city": "Da Nang",
+      "country": "Vietnam",
+      "timezone": "Asia/Ho_Chi_Minh"
+    },
+    {
+      "iata": "CXR",
+      "icao": "VVCR",
+      "name": "Cam Ranh International Airport",
+      "city": "Nha Trang / Cam Ranh",
+      "country": "Vietnam",
+      "timezone": "Asia/Ho_Chi_Minh"
+    },
+    {
+      "iata": "PQC",
+      "icao": "VVPQ",
+      "name": "Phu Quoc International Airport",
+      "city": "Phu Quoc",
+      "country": "Vietnam",
+      "timezone": "Asia/Ho_Chi_Minh"
+    },
+    {
+      "iata": "BKK",
+      "icao": "VTBS",
+      "name": "Suvarnabhumi Airport",
+      "city": "Bangkok",
+      "country": "Thailand",
+      "timezone": "Asia/Bangkok"
+    }
+  ],
+  "weather_feed": {
+    "source": "simulated_meteorological_feed",
+    "issued_at_local": "2026-07-12T05:25:00+07:00",
+    "storm": {
+      "name": "Tropical Storm Krosa",
+      "classification": "severe tropical storm",
+      "center_position": {
+        "lat": 10.3,
+        "lon": 108.5
+      },
+      "movement": "WNW 13 kt",
+      "max_sustained_wind_kt": 55,
+      "distance_from_sgn_nm": 116,
+      "closest_approach_to_sgn_local": "2026-07-12T10:20:00+07:00",
+      "forecast_confidence": 0.78
+    },
+    "airport_observations": [
+      {
+        "airport": "SGN",
+        "metar": "VVTS 112230Z 07014G24KT 4000 TSRA SCT012CB BKN025 27/25 Q1004 TEMPO 2500 +TSRA",
+        "observed_at_utc": "2026-07-11T22:30:00Z",
+        "wind_dir_deg": 70,
+        "wind_speed_kt": 14,
+        "gust_kt": 24,
+        "visibility_m": 4000,
+        "ceiling_ft": 2500,
+        "hazards": ["TSRA", "CB"],
+        "ops_impact": "Departures still possible; convective cells already near final approach path."
+      },
+      {
+        "airport": "DAD",
+        "metar": "VVDN 112230Z 05009KT 9999 FEW018 SCT030 29/24 Q1007",
+        "observed_at_utc": "2026-07-11T22:30:00Z",
+        "ops_impact": "Normal."
+      },
+      {
+        "airport": "HAN",
+        "metar": "VVNB 112230Z 12006KT 8000 SCT020 28/25 Q1006",
+        "observed_at_utc": "2026-07-11T22:30:00Z",
+        "ops_impact": "Normal."
+      }
+    ],
+    "airport_forecasts": [
+      {
+        "airport": "SGN",
+        "valid_from_local": "2026-07-12T06:00:00+07:00",
+        "valid_to_local": "2026-07-12T12:00:00+07:00",
+        "taf": "TAF VVTS 112300Z 1200/1212 07016G28KT 5000 TSRA BKN014CB TEMPO 1202/1206 2500 +TSRA 09022G38KT BKN008CB PROB40 1204/1208 1600 +TSRA WS020/09045KT",
+        "hourly_risk": [
+          {
+            "local_time": "06:00",
+            "arrival_capacity_per_hour": 22,
+            "departure_capacity_per_hour": 24,
+            "delay_risk_score": 0.37,
+            "main_driver": "gusty crosswind and thunderstorm cells west of SGN"
+          },
+          {
+            "local_time": "07:00",
+            "arrival_capacity_per_hour": 18,
+            "departure_capacity_per_hour": 20,
+            "delay_risk_score": 0.58,
+            "main_driver": "convective build-up, likely flow control"
+          },
+          {
+            "local_time": "08:00",
+            "arrival_capacity_per_hour": 14,
+            "departure_capacity_per_hour": 16,
+            "delay_risk_score": 0.76,
+            "main_driver": "thunderstorm over departure corridor"
+          },
+          {
+            "local_time": "09:00",
+            "arrival_capacity_per_hour": 10,
+            "departure_capacity_per_hour": 12,
+            "delay_risk_score": 0.89,
+            "main_driver": "heavy rain, windshear probability and runway spacing constraints"
+          },
+          {
+            "local_time": "10:00",
+            "arrival_capacity_per_hour": 8,
+            "departure_capacity_per_hour": 10,
+            "delay_risk_score": 0.93,
+            "main_driver": "storm closest approach"
+          },
+          {
+            "local_time": "11:00",
+            "arrival_capacity_per_hour": 14,
+            "departure_capacity_per_hour": 16,
+            "delay_risk_score": 0.72,
+            "main_driver": "storm moving inland; residual cells"
+          }
+        ]
+      }
+    ]
+  },
+  "notams": [
+    {
+      "id": "A1624/26",
+      "airport": "SGN",
+      "effective_from_local": "2026-07-12T06:30:00+07:00",
+      "effective_to_local": "2026-07-12T12:30:00+07:00",
+      "category": "ATFM",
+      "text": "DUE WX, ARR/DEP FLOW MANAGEMENT IN EFFECT. EXPECT GDP/CTOT ASSIGNMENT DURING CONVECTIVE ACTIVITY.",
+      "ops_impact": "Expected departure slots during 08:00-11:00 local window."
+    },
+    {
+      "id": "A1625/26",
+      "airport": "SGN",
+      "effective_from_local": "2026-07-12T08:00:00+07:00",
+      "effective_to_local": "2026-07-12T13:00:00+07:00",
+      "category": "RAMP",
+      "text": "RAMP CONTROL MAY SUSPEND OUTDOOR GROUND HANDLING DURING LIGHTNING WARNING.",
+      "ops_impact": "Adds 8-18 minutes to affected turns when lightning observed within 5 NM."
+    },
+    {
+      "id": "A1609/26",
+      "airport": "SGN",
+      "effective_from_local": "2026-07-11T22:00:00+07:00",
+      "effective_to_local": "2026-07-12T16:00:00+07:00",
+      "category": "TAXIWAY",
+      "text": "TWY W4 CLSD BTN S4 AND S5 DUE WIP.",
+      "ops_impact": "Remote stands R31/R32 incur 4-6 minutes additional taxi time."
+    }
+  ],
+  "fleet": [
+    {
+      "tail": "VN-A152",
+      "type": "A321-271N",
+      "seat_capacity": 240,
+      "base": "SGN",
+      "current_airport": "SGN",
+      "current_state": "at_gate",
+      "gate": "14",
+      "available_from_local": "2026-07-12T06:20:00+07:00",
+      "fuel_kg": 6100,
+      "utilization_last_24h_hours": 12.4,
+      "mel_items": [],
+      "next_maintenance": {
+        "type": "A-check",
+        "due_local": "2026-07-12T14:30:00+07:00",
+        "due_in_flight_hours": 5.1,
+        "airport_required": "SGN"
+      }
+    },
+    {
+      "tail": "VN-A237",
+      "type": "A321-271NX",
+      "seat_capacity": 240,
+      "base": "SGN",
+      "current_airport": "SGN",
+      "current_state": "arriving",
+      "inbound_flight": "VJ205",
+      "estimated_on_block_local": "2026-07-12T06:08:00+07:00",
+      "gate": "18",
+      "fuel_kg": 7200,
+      "utilization_last_24h_hours": 8.1,
+      "mel_items": [
+        {
+          "code": "25-63-01",
+          "description": "Forward galley chiller deferred",
+          "operational_restriction": "No hot meal uplift required on domestic sectors",
+          "expires_local": "2026-07-15T23:59:00+07:00"
+        }
+      ],
+      "next_maintenance": {
+        "type": "line check",
+        "due_local": "2026-07-12T23:30:00+07:00",
+        "due_in_flight_hours": 11.6,
+        "airport_required": "SGN"
+      }
+    },
+    {
+      "tail": "VN-A321",
+      "type": "A321-211",
+      "seat_capacity": 230,
+      "base": "SGN",
+      "current_airport": "DAD",
+      "current_state": "scheduled_inbound_to_sgn",
+      "positioning_flight": "VJ800",
+      "estimated_on_block_sgn_local": "2026-07-12T08:05:00+07:00",
+      "available_from_local": "2026-07-12T08:40:00+07:00",
+      "utilization_last_24h_hours": 10.8,
+      "mel_items": [],
+      "next_maintenance": {
+        "type": "weekly check",
+        "due_local": "2026-07-13T02:00:00+07:00",
+        "airport_required": "SGN"
+      }
+    },
+    {
+      "tail": "VN-A678",
+      "type": "A320-214",
+      "seat_capacity": 180,
+      "base": "SGN",
+      "current_airport": "SGN",
+      "current_state": "at_remote_stand",
+      "stand": "R32",
+      "available_from_local": "2026-07-12T05:55:00+07:00",
+      "utilization_last_24h_hours": 6.3,
+      "mel_items": [
+        {
+          "code": "34-11-02",
+          "description": "Weather radar channel 2 inoperative",
+          "operational_restriction": "Requires channel 1 serviceable; avoid dispatch into forecast severe convective activity unless alternate routing accepted",
+          "expires_local": "2026-07-13T20:00:00+07:00"
+        }
+      ],
+      "next_maintenance": {
+        "type": "defect rectification",
+        "due_local": "2026-07-12T09:30:00+07:00",
+        "airport_required": "SGN"
+      }
+    },
+    {
+      "tail": "VN-A889",
+      "type": "A330-343",
+      "seat_capacity": 377,
+      "base": "SGN",
+      "current_airport": "SGN",
+      "current_state": "standby_for_international",
+      "stand": "T2-28",
+      "available_from_local": "2026-07-12T07:20:00+07:00",
+      "utilization_last_24h_hours": 9.6,
+      "mel_items": [],
+      "next_maintenance": {
+        "type": "ETOPS service check",
+        "due_local": "2026-07-12T17:00:00+07:00",
+        "airport_required": "SGN"
+      }
+    }
+  ],
+  "crew_rosters": [
+    {
+      "crew_id": "C-SGN-041",
+      "role_set": "A321 flight deck",
+      "captain": "Nguyen T. Minh",
+      "first_officer": "Tran Q. Anh",
+      "qualified_types": ["A320", "A321"],
+      "report_local": "2026-07-12T04:45:00+07:00",
+      "duty_end_limit_local": "2026-07-12T17:45:00+07:00",
+      "assigned_flights": ["VJ152", "VJ153"],
+      "status": "checked_in",
+      "constraints": []
+    },
+    {
+      "crew_id": "C-SGN-052",
+      "role_set": "A321 flight deck",
+      "captain": "Pham H. Long",
+      "first_officer": "Le B. Khoa",
+      "qualified_types": ["A320", "A321"],
+      "report_local": "2026-07-12T05:10:00+07:00",
+      "duty_end_limit_local": "2026-07-12T18:10:00+07:00",
+      "assigned_flights": ["VJ205", "VJ206"],
+      "status": "checked_in",
+      "constraints": [
+        "captain requires 30-minute medical documentation stop at SGN before next duty pairing"
+      ]
+    },
+    {
+      "crew_id": "C-SGN-078",
+      "role_set": "A320 cabin",
+      "lead": "Do M. Linh",
+      "qualified_types": ["A320", "A321"],
+      "report_local": "2026-07-12T05:20:00+07:00",
+      "duty_end_limit_local": "2026-07-12T16:50:00+07:00",
+      "assigned_flights": ["VJ310", "VJ311"],
+      "status": "checked_in",
+      "constraints": []
+    },
+    {
+      "crew_id": "C-SGN-R12",
+      "role_set": "reserve mixed",
+      "captain": "Bui T. Son",
+      "first_officer": "Hoang N. Viet",
+      "lead": "Huynh P. Mai",
+      "qualified_types": ["A320", "A321"],
+      "reserve_available_from_local": "2026-07-12T06:40:00+07:00",
+      "duty_end_limit_local": "2026-07-12T19:40:00+07:00",
+      "status": "reserve_at_sgn",
+      "constraints": [
+        "60-minute callout already satisfied because reserve is on airport standby"
+      ]
+    },
+    {
+      "crew_id": "C-SGN-091",
+      "role_set": "A321 international mixed",
+      "captain": "Vo D. Hieu",
+      "first_officer": "Dang M. Phuc",
+      "lead": "Nguyen H. Trang",
+      "qualified_types": ["A320", "A321"],
+      "report_local": "2026-07-12T07:20:00+07:00",
+      "duty_end_limit_local": "2026-07-12T20:20:00+07:00",
+      "assigned_flights": ["VJ801"],
+      "status": "not_yet_reported",
+      "constraints": [
+        "International document check requires aircraft at T2 gate by 08:25 to preserve BKK slot"
+      ]
+    }
+  ],
+  "scheduled_flights": [
+    {
+      "flight": "VJ152",
+      "route": "SGN-HAN",
+      "scheduled_departure_local": "2026-07-12T07:05:00+07:00",
+      "scheduled_arrival_local": "2026-07-12T09:15:00+07:00",
+      "aircraft_tail": "VN-A152",
+      "planned_gate": "14",
+      "passengers_booked": 228,
+      "checked_bags": 156,
+      "crew_id": "C-SGN-041",
+      "priority": "high",
+      "business_context": "Domestic trunk route; 41 passengers connect onward at HAN within 90 minutes.",
+      "status_at_snapshot": "boarding_not_started"
+    },
+    {
+      "flight": "VJ237",
+      "route": "SGN-DAD",
+      "scheduled_departure_local": "2026-07-12T07:35:00+07:00",
+      "scheduled_arrival_local": "2026-07-12T08:55:00+07:00",
+      "aircraft_tail": "VN-A237",
+      "planned_gate": "18",
+      "passengers_booked": 166,
+      "checked_bags": 101,
+      "crew_id": "C-SGN-052",
+      "priority": "medium",
+      "business_context": "Short sector; DAD has spare gate capacity and crew buffer.",
+      "status_at_snapshot": "inbound_aircraft_arriving"
+    },
+    {
+      "flight": "VJ205",
+      "route": "DAD-SGN",
+      "scheduled_departure_local": "2026-07-12T04:45:00+07:00",
+      "scheduled_arrival_local": "2026-07-12T06:05:00+07:00",
+      "aircraft_tail": "VN-A237",
+      "planned_gate": "18",
+      "passengers_booked": 198,
+      "checked_bags": 132,
+      "crew_id": "C-SGN-052",
+      "priority": "high",
+      "business_context": "Inbound feed for VJ237 and 23 international connections at SGN.",
+      "status_at_snapshot": "airborne",
+      "estimated_arrival_local": "2026-07-12T06:02:00+07:00"
+    },
+    {
+      "flight": "VJ310",
+      "route": "SGN-CXR",
+      "scheduled_departure_local": "2026-07-12T08:10:00+07:00",
+      "scheduled_arrival_local": "2026-07-12T09:15:00+07:00",
+      "aircraft_tail": "VN-A678",
+      "planned_stand": "R32",
+      "passengers_booked": 176,
+      "checked_bags": 89,
+      "crew_id": "C-SGN-078",
+      "priority": "low",
+      "business_context": "Leisure route with low connection exposure.",
+      "status_at_snapshot": "not_started"
+    },
+    {
+      "flight": "VJ801",
+      "route": "SGN-BKK",
+      "scheduled_departure_local": "2026-07-12T09:05:00+07:00",
+      "scheduled_arrival_local": "2026-07-12T10:40:00+07:00",
+      "aircraft_tail": "VN-A321",
+      "planned_gate": "26",
+      "passengers_booked": 213,
+      "checked_bags": 144,
+      "crew_id": "C-SGN-091",
+      "priority": "high",
+      "business_context": "International departure; missed slot risk at BKK if delayed beyond 09:50.",
+      "status_at_snapshot": "aircraft_inbound_from_dad"
+    },
+    {
+      "flight": "VJ640",
+      "route": "SGN-DAD",
+      "scheduled_departure_local": "2026-07-12T09:40:00+07:00",
+      "scheduled_arrival_local": "2026-07-12T11:00:00+07:00",
+      "aircraft_tail": "VN-A152",
+      "planned_gate": "14",
+      "passengers_booked": 221,
+      "checked_bags": 118,
+      "crew_id": "C-SGN-041",
+      "priority": "medium",
+      "business_context": "Aircraft expected to continue DAD-SGN-HAN evening rotation.",
+      "status_at_snapshot": "dependent_on_VJ152_return"
+    },
+    {
+      "flight": "VJ326",
+      "route": "SGN-PQC",
+      "scheduled_departure_local": "2026-07-12T10:15:00+07:00",
+      "scheduled_arrival_local": "2026-07-12T11:20:00+07:00",
+      "aircraft_tail": "VN-A237",
+      "planned_gate": "18",
+      "passengers_booked": 172,
+      "checked_bags": 97,
+      "crew_id": "C-SGN-R12",
+      "priority": "medium",
+      "business_context": "Recoverable leisure sector; can absorb up to 55 minutes without night-stop disruption.",
+      "status_at_snapshot": "not_started"
+    }
+  ],
+  "passenger_connections": [
+    {
+      "id": "CONN-HAN-01",
+      "inbound_flight": "VJ152",
+      "connecting_airport": "HAN",
+      "outbound_flight": "VJ421",
+      "outbound_route": "HAN-ICN",
+      "passenger_count": 18,
+      "scheduled_connection_minutes": 72,
+      "protected_if_arrival_delay_under_minutes": 24,
+      "misconnect_cost_usd_per_passenger": 310
+    },
+    {
+      "id": "CONN-HAN-02",
+      "inbound_flight": "VJ152",
+      "connecting_airport": "HAN",
+      "outbound_flight": "VJ503",
+      "outbound_route": "HAN-DAD",
+      "passenger_count": 23,
+      "scheduled_connection_minutes": 82,
+      "protected_if_arrival_delay_under_minutes": 34,
+      "misconnect_cost_usd_per_passenger": 95
+    },
+    {
+      "id": "CONN-SGN-01",
+      "inbound_flight": "VJ205",
+      "connecting_airport": "SGN",
+      "outbound_flight": "VJ801",
+      "outbound_route": "SGN-BKK",
+      "passenger_count": 23,
+      "scheduled_connection_minutes": 180,
+      "protected_if_arrival_delay_under_minutes": 105,
+      "misconnect_cost_usd_per_passenger": 220
+    },
+    {
+      "id": "CONN-DAD-01",
+      "inbound_flight": "VJ237",
+      "connecting_airport": "DAD",
+      "outbound_flight": "VJ721",
+      "outbound_route": "DAD-TPE",
+      "passenger_count": 9,
+      "scheduled_connection_minutes": 145,
+      "protected_if_arrival_delay_under_minutes": 75,
+      "misconnect_cost_usd_per_passenger": 260
+    }
+  ],
+  "gate_and_stand_status": [
+    {
+      "airport": "SGN",
+      "resource": "Gate 14",
+      "terminal": "T1",
+      "available_from_local": "2026-07-12T05:30:00+07:00",
+      "turnaround_score": 0.68,
+      "notes": "Standard domestic gate; longer taxi route if runway 25 direction used."
+    },
+    {
+      "airport": "SGN",
+      "resource": "Gate 18",
+      "terminal": "T1",
+      "available_from_local": "2026-07-12T06:05:00+07:00",
+      "turnaround_score": 0.91,
+      "notes": "Closest modeled stand to baggage belt and crew room; reduces passenger boarding transfer time."
+    },
+    {
+      "airport": "SGN",
+      "resource": "Remote R32",
+      "terminal": "T1",
+      "available_from_local": "2026-07-12T05:30:00+07:00",
+      "turnaround_score": 0.42,
+      "notes": "Affected by TWY W4 closure and lightning ramp-stop risk."
+    },
+    {
+      "airport": "SGN",
+      "resource": "Gate 26",
+      "terminal": "T2",
+      "available_from_local": "2026-07-12T08:20:00+07:00",
+      "turnaround_score": 0.74,
+      "notes": "International gate; usable for VJ801 if inbound aircraft arrives by 08:05."
+    }
+  ],
+  "maintenance_logs": [
+    {
+      "tail": "VN-A152",
+      "logged_at_local": "2026-07-12T04:58:00+07:00",
+      "severity": "planning_constraint",
+      "text": "A-check due 14:30 local at SGN. Aircraft can operate one SGN-HAN-SGN cycle if return block before 13:45; avoid reassignment that leaves aircraft away from SGN after 14:00."
+    },
+    {
+      "tail": "VN-A237",
+      "logged_at_local": "2026-07-12T03:42:00+07:00",
+      "severity": "minor_deferred_item",
+      "text": "Forward galley chiller deferred. No operational impact on domestic sectors without hot meal uplift."
+    },
+    {
+      "tail": "VN-A678",
+      "logged_at_local": "2026-07-12T05:12:00+07:00",
+      "severity": "dispatch_risk",
+      "text": "Weather radar channel 2 inoperative; dispatch into forecast embedded thunderstorm activity not recommended unless channel 1 confirmed serviceable and captain accepts route."
+    }
+  ],
+  "agent_findings": [
+    {
+      "agent": "weather_agent",
+      "status": "complete",
+      "risk_score": 0.88,
+      "summary": "SGN capacity likely drops sharply from 08:00 to 11:00 local. Highest risk is 09:00-10:30 due storm closest approach, heavy TSRA and windshear probability.",
+      "evidence": [
+        "Forecast arrival capacity decreases from 22/hour at 06:00 to 8/hour at 10:00.",
+        "TAF includes PROB40 windshear and +TSRA during the decision window.",
+        "NOTAM A1624/26 warns of flow-management and CTOT assignment."
+      ]
+    },
+    {
+      "agent": "aircraft_agent",
+      "status": "complete",
+      "risk_score": 0.71,
+      "summary": "VN-A152 is capacity-matched to VJ152 but constrained by A-check at SGN. VN-A237 can take VJ152 with equal seat count after inbound VJ205 blocks at Gate 18.",
+      "evidence": [
+        "VN-A152 and VN-A237 both seat 240 passengers.",
+        "VN-A237 expected on-block 06:08, allowing a 57-minute domestic turn for VJ152 at 07:05 if gate and crew are pre-positioned.",
+        "VN-A152 should remain on lower-risk SGN-DAD sector or ground buffer to protect A-check."
+      ]
+    },
+    {
+      "agent": "crew_agent",
+      "status": "complete",
+      "risk_score": 0.63,
+      "summary": "Crew C-SGN-041 can operate VJ152 on VN-A237. Reserve crew C-SGN-R12 can cover VJ237/VJ326 after 06:40 without exceeding duty window.",
+      "evidence": [
+        "C-SGN-041 is A320/A321 qualified and already checked in.",
+        "Reserve crew is airport standby and available from 06:40.",
+        "C-SGN-052 has a captain documentation stop that creates recovery risk if assigned to a tight post-arrival turn."
+      ]
+    },
+    {
+      "agent": "maintenance_agent",
+      "status": "complete",
+      "risk_score": 0.66,
+      "summary": "Avoid dispatching VN-A678 into the worst SGN convective window and avoid leaving VN-A152 away from SGN after 14:00.",
+      "evidence": [
+        "VN-A678 has a weather-radar deferred item and defect rectification due 09:30 at SGN.",
+        "VN-A152 A-check due 14:30 local at SGN.",
+        "VN-A237 has no material domestic dispatch restriction."
+      ]
+    },
+    {
+      "agent": "cost_impact_agent",
+      "status": "complete",
+      "risk_score": 0.82,
+      "summary": "Protecting VJ152 has the highest value because 41 passengers connect at HAN and the storm window makes later recovery expensive.",
+      "evidence": [
+        "VJ152 has estimated misconnect exposure of USD 7,765 if delayed over 34 minutes.",
+        "A 42-minute controlled delay to VJ237 is cheaper than a 60-90 minute uncontrolled delay to VJ152.",
+        "Moving VJ152 to Gate 18 saves an estimated 11 minutes of turn and taxi/boarding friction."
+      ]
+    }
+  ],
+  "supervisor_decision": {
+    "generated_at_local": "2026-07-12T05:43:00+07:00",
+    "headline": "Swap VJ152 onto VN-A237, delay VJ237 by 42 minutes, move VJ152 to Gate 18, keep VN-A678 on ground until storm-risk drops.",
+    "confidence": 0.94,
+    "recommended_actions": [
+      {
+        "action_id": "ACT-001",
+        "type": "aircraft_swap",
+        "priority": 1,
+        "flight": "VJ152",
+        "from_tail": "VN-A152",
+        "to_tail": "VN-A237",
+        "reason": "Protects high-connection SGN-HAN flight with a 240-seat aircraft that is less maintenance-constrained and already arriving to the best available gate.",
+        "operational_effect": "VJ152 can depart at 07:14 local instead of being pushed into the 08:00+ flow-control window.",
+        "risks": [
+          "Requires inbound VJ205 to block no later than 06:12.",
+          "Requires cleaning/catering fast-turn package at Gate 18."
+        ]
+      },
+      {
+        "action_id": "ACT-002",
+        "type": "controlled_delay",
+        "priority": 2,
+        "flight": "VJ237",
+        "delay_minutes": 42,
+        "new_departure_local": "2026-07-12T08:17:00+07:00",
+        "reason": "DAD sector has lower connection exposure and can absorb delay with less passenger and network cost.",
+        "operational_effect": "Moves VJ237 behind VJ152 and allows reserve crew to operate if C-SGN-052 becomes constrained."
+      },
+      {
+        "action_id": "ACT-003",
+        "type": "gate_change",
+        "priority": 3,
+        "flight": "VJ152",
+        "from_resource": "Gate 14",
+        "to_resource": "Gate 18",
+        "reason": "Gate 18 has best turnaround score and avoids the modeled taxiway W4 remote-stand penalty.",
+        "estimated_turnaround_minutes_saved": 11
+      },
+      {
+        "action_id": "ACT-004",
+        "type": "crew_reallocation",
+        "priority": 4,
+        "flight": "VJ237",
+        "from_crew": "C-SGN-052",
+        "to_crew": "C-SGN-R12",
+        "reason": "Removes duty-risk from C-SGN-052 and keeps the reserve crew productive inside its standby window.",
+        "condition": "Execute if VJ237 cannot board by 07:45 or if captain documentation stop exceeds 20 minutes."
+      },
+      {
+        "action_id": "ACT-005",
+        "type": "maintenance_protection",
+        "priority": 5,
+        "tail": "VN-A678",
+        "reason": "Avoid dispatch into severe convective activity with radar-channel MEL and keep defect rectification slot at SGN.",
+        "operational_effect": "Delay VJ310 until at least 10:45 or substitute another aircraft after storm cell clears."
+      }
+    ],
+    "projected_outcome": {
+      "total_estimated_savings_usd": 18200,
+      "delay_minutes_avoided": 96,
+      "misconnections_prevented": 38,
+      "protected_passengers": 269,
+      "residual_risk": "If SGN arrival/departure capacity falls below 8 movements/hour before 08:00, VJ152 may still receive CTOT delay."
+    },
+    "alternatives_considered": [
+      {
+        "option": "Do nothing",
+        "score": 0.41,
+        "rejected_because": "VJ152 likely departs after 08:00 and risks 41 connecting passengers at HAN."
+      },
+      {
+        "option": "Use VN-A678 for VJ152",
+        "score": 0.52,
+        "rejected_because": "Aircraft has only 180 seats for 228 passengers and weather-radar deferred item."
+      },
+      {
+        "option": "Hold VJ205 inbound for gate sequencing",
+        "score": 0.46,
+        "rejected_because": "Would damage 23 international connections at SGN and reduce available turn time."
+      },
+      {
+        "option": "Cancel VJ310 and use VN-A678 maintenance slot for VJ237",
+        "score": 0.59,
+        "rejected_because": "Creates passenger reaccommodation cost without solving VJ152 connection exposure."
+      }
+    ]
+  },
+  "explainability_payload": {
+    "user_question": "Why?",
+    "short_answer": "Because VJ152 has the highest passenger-connection risk, the weather window at SGN worsens after 08:00, and VN-A237 can cover VJ152 from Gate 18 with the same seat count and fewer maintenance constraints. Delaying VJ237 is cheaper because DAD can absorb the delay and fewer passengers misconnect.",
+    "decision_chain": [
+      {
+        "step": 1,
+        "finding": "Weather risk rises sharply from 08:00.",
+        "data_used": ["TAF VVTS", "hourly capacity forecast", "NOTAM A1624/26"],
+        "impact": "Flights departing before 08:00 are materially less likely to receive CTOT delay."
+      },
+      {
+        "step": 2,
+        "finding": "VJ152 is the flight to protect.",
+        "data_used": ["41 onward connections at HAN", "228 passengers booked", "high trunk-route priority"],
+        "impact": "A delay over 34 minutes creates the largest misconnect cost in the wave."
+      },
+      {
+        "step": 3,
+        "finding": "VN-A237 is a better aircraft for VJ152 than VN-A152.",
+        "data_used": ["same 240-seat capacity", "less urgent maintenance", "arrives at Gate 18 by 06:08"],
+        "impact": "The aircraft swap preserves capacity and makes a pre-weather-window departure feasible."
+      },
+      {
+        "step": 4,
+        "finding": "Gate 18 saves time.",
+        "data_used": ["gate turnaround scores", "remote/taxiway W4 penalty", "baggage and crew-room proximity"],
+        "impact": "Estimated 11-minute saving protects the departure from slipping into the ATFM window."
+      },
+      {
+        "step": 5,
+        "finding": "VJ237 is the best delay candidate.",
+        "data_used": ["DAD connection exposure", "DAD spare capacity", "reserve crew availability"],
+        "impact": "A controlled 42-minute delay on VJ237 produces lower cost than an uncontrolled delay on VJ152."
+      }
+    ],
+    "numbers_shown_to_ops_manager": {
+      "confidence": "94%",
+      "estimated_savings": "USD 18,200",
+      "turnaround_saving": "11 minutes",
+      "controlled_delay": "42 minutes",
+      "misconnections_prevented": 38
+    }
+  }
+}
