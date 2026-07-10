@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from app import SCENARIO_OPTIONS, load_scenario, run_agents
+from app import SCENARIO_OPTIONS, impact_options, load_scenario, run_agents
 
 
 class ScenarioVariantTests(unittest.TestCase):
@@ -41,6 +41,13 @@ class ScenarioVariantTests(unittest.TestCase):
         self.assertIn("departure_metering", action_types)
         self.assertIn("passenger_protection", action_types)
         self.assertIn("recovery_buffer", action_types)
+
+    def test_impact_comparison_shows_remaining_misconnects(self) -> None:
+        data = load_scenario("sgn_network_stress")
+        decision = run_agents(data)
+        ai_row = next(item for item in impact_options(decision) if item["option"] == "AI recommendation")
+        self.assertEqual(ai_row["misconnects"], 3)
+        self.assertEqual(decision["projected_outcome"]["misconnections_prevented"], 38)
 
 
 if __name__ == "__main__":

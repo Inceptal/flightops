@@ -1398,10 +1398,17 @@ def monitor_events(data: dict[str, Any], decision: dict[str, Any]) -> list[tuple
 def impact_options(decision: dict[str, Any]) -> list[dict[str, Any]]:
     outcome = decision["projected_outcome"]
     ai_cost = max(4200, outcome["total_estimated_savings_usd"] - 10500)
+    baseline_misconnects = 41
+    ai_misconnects = max(0, baseline_misconnects - outcome["misconnections_prevented"])
     return [
-        {"option": "Do nothing", "delay": 138, "misconnects": 41, "cost": ai_cost + outcome["total_estimated_savings_usd"]},
+        {
+            "option": "Do nothing",
+            "delay": 138,
+            "misconnects": baseline_misconnects,
+            "cost": ai_cost + outcome["total_estimated_savings_usd"],
+        },
         {"option": "Delay protected flight", "delay": 96, "misconnects": 17, "cost": ai_cost + 9400},
-        {"option": "AI recommendation", "delay": 42, "misconnects": outcome["misconnections_prevented"], "cost": ai_cost},
+        {"option": "AI recommendation", "delay": 42, "misconnects": ai_misconnects, "cost": ai_cost},
     ]
 
 
