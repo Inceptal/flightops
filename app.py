@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import html
 import json
 import base64
@@ -14,6 +15,12 @@ from flightops.supervisor import SupervisorAgent
 
 DATA_PATH = Path("demo-data/flightops-ai-typhoon-sgn-2026-07-12.json")
 LOGO_PATH = Path("assets/vietjet-air-logo.svg")
+SCENARIO_OPTIONS = {
+    "sgn_typhoon": "Typhoon approaching SGN",
+    "sgn_lightning": "Lightning ramp stop at SGN",
+    "sgn_maintenance": "Maintenance cascade at SGN",
+    "sgn_network_stress": "High-volume network stress",
+}
 AGENT_LABELS = {
     "weather_agent": "Weather",
     "aircraft_agent": "Aircraft",
@@ -55,6 +62,150 @@ AGENT_SHORT_SUMMARIES = {
 def load_demo_data() -> dict[str, Any]:
     with DATA_PATH.open("r", encoding="utf-8") as file:
         return json.load(file)
+
+
+@st.cache_data
+def load_scenario(scenario_key: str) -> dict[str, Any]:
+    data = copy.deepcopy(load_demo_data())
+    if scenario_key == "sgn_lightning":
+        apply_lightning_scenario(data)
+    elif scenario_key == "sgn_maintenance":
+        apply_maintenance_scenario(data)
+    elif scenario_key == "sgn_network_stress":
+        apply_network_stress_scenario(data)
+    else:
+        data["scenario"]["status_label"] = "Typhoon risk near SGN"
+        data["scenario"]["summary"] = "Typhoon disruption at Ho Chi Minh City"
+    data["scenario"]["selected_key"] = scenario_key
+    return data
+
+
+def apply_lightning_scenario(data: dict[str, Any]) -> None:
+    data["scenario"]["id"] = "flightops-ai-sgn-lightning-ramp-stop-2026-07-12"
+    data["scenario"]["name"] = "Lightning ramp-stop at SGN"
+    data["scenario"]["status_label"] = "Lightning ramp stop near SGN"
+    data["scenario"]["summary"] = "Lightning warning blocks exposed ground handling during the morning bank."
+    data["weather_feed"]["storm"]["name"] = "Convective Cell Line Bravo"
+    data["weather_feed"]["storm"]["classification"] = "severe convective line"
+    for item in data["weather_feed"]["airport_forecasts"][0]["hourly_risk"]:
+        if item["local_time"] in {"07:00", "08:00"}:
+            item["delay_risk_score"] = min(0.94, item["delay_risk_score"] + 0.18)
+            item["main_driver"] = "lightning within 5 NM and ramp handling suspension risk"
+        if item["local_time"] == "09:00":
+            item["departure_capacity_per_hour"] = 9
+            item["arrival_capacity_per_hour"] = 9
+    data["notams"][1]["text"] = "LIGHTNING WARNING PROCEDURE ACTIVE. RAMP HANDLING SUSPENSION EXPECTED IN 15-25 MIN BURSTS."
+    data["notams"][1]["ops_impact"] = "Fast-turn flights at remote stands likely lose 15-25 minutes."
+
+
+def apply_maintenance_scenario(data: dict[str, Any]) -> None:
+    data["scenario"]["id"] = "flightops-ai-sgn-maintenance-cascade-2026-07-12"
+    data["scenario"]["name"] = "Maintenance cascade at SGN"
+    data["scenario"]["status_label"] = "Maintenance cascade at SGN"
+    data["scenario"]["summary"] = "Weather disruption combines with two narrow-body maintenance constraints."
+    data["fleet"][0]["next_maintenance"]["due_local"] = "2026-07-12T13:20:00+07:00"
+    data["fleet"][0]["next_maintenance"]["due_in_flight_hours"] = 4.3
+    data["maintenance_logs"].append(
+        {
+            "tail": "VN-A152",
+            "logged_at_local": "2026-07-12T05:28:00+07:00",
+            "severity": "planning_constraint",
+            "text": "Hydraulic service inspection added to A-check package; aircraft must return SGN no later than 13:05.",
+        }
+    )
+    data["fleet"][3]["mel_items"].append(
+        {
+            "code": "21-52-03",
+            "description": "Pack 2 temperature control intermittent",
+            "operational_restriction": "Avoid high-delay ground holds during peak heat unless engineering accepts.",
+            "expires_local": "2026-07-13T20:00:00+07:00",
+        }
+    )
+    data["scheduled_flights"][3]["status_at_snapshot"] = "maintenance_hold_pending_engineering_release"
+
+
+def apply_network_stress_scenario(data: dict[str, Any]) -> None:
+    data["scenario"]["id"] = "flightops-ai-sgn-network-stress-2026-07-12"
+    data["scenario"]["name"] = "High-volume SGN network stress"
+    data["scenario"]["status_label"] = "High-volume network stress"
+    data["scenario"]["summary"] = "Large morning bank with many monitored flights, crews, aircraft and passenger flows."
+    routes = ["SGN-HAN", "SGN-DAD", "SGN-CXR", "SGN-PQC", "SGN-HUI", "SGN-HPH", "SGN-VCA", "SGN-BMV"]
+    tails = []
+    for index in range(18):
+        tail = f"VN-B{700 + index}"
+        tails.append(tail)
+        data["fleet"].append(
+            {
+                "tail": tail,
+                "type": "A321-271N" if index % 3 else "A320-214",
+                "seat_capacity": 240 if index % 3 else 180,
+                "base": "SGN",
+                "current_airport": "SGN" if index % 4 else "HAN",
+                "current_state": "monitored_rotation",
+                "available_from_local": f"2026-07-12T{6 + index % 4:02d}:{(index * 7) % 60:02d}:00+07:00",
+                "utilization_last_24h_hours": round(6.5 + (index % 8) * 0.7, 1),
+                "mel_items": [],
+                "next_maintenance": {
+                    "type": "line check",
+                    "due_local": "2026-07-12T23:30:00+07:00",
+                    "airport_required": "SGN",
+                },
+            }
+        )
+    for index in range(16):
+        crew_id = f"C-SGN-X{index + 1:02d}"
+        data["crew_rosters"].append(
+            {
+                "crew_id": crew_id,
+                "role_set": "A320/A321 mixed",
+                "qualified_types": ["A320", "A321"],
+                "report_local": f"2026-07-12T{5 + index % 3:02d}:{(index * 11) % 60:02d}:00+07:00",
+                "duty_end_limit_local": f"2026-07-12T{17 + index % 4:02d}:{(index * 11) % 60:02d}:00+07:00",
+                "assigned_flights": [],
+                "status": "monitored",
+                "constraints": [],
+            }
+        )
+    for index in range(36):
+        route = routes[index % len(routes)]
+        tail = tails[index % len(tails)]
+        hour = 6 + (index // 7)
+        minute = (index * 9) % 60
+        passengers = 108 + (index * 13) % 68
+        flight_number = f"VJ{900 + index}"
+        data["scheduled_flights"].append(
+            {
+                "flight": flight_number,
+                "route": route,
+                "scheduled_departure_local": f"2026-07-12T{hour:02d}:{minute:02d}:00+07:00",
+                "scheduled_arrival_local": f"2026-07-12T{hour + 1:02d}:{(minute + 20) % 60:02d}:00+07:00",
+                "aircraft_tail": tail,
+                "planned_gate": str(10 + (index % 18)),
+                "passengers_booked": passengers,
+                "checked_bags": round(passengers * 0.58),
+                "crew_id": f"C-SGN-X{index % 16 + 1:02d}",
+                "priority": "medium" if index % 5 else "low",
+                "business_context": "Additional monitored flight in high-volume network stress scenario.",
+                "status_at_snapshot": "monitored_for_downstream_delay",
+            }
+        )
+        if index % 4 == 0:
+            data["passenger_connections"].append(
+                {
+                    "id": f"CONN-STRESS-{index:02d}",
+                    "inbound_flight": flight_number,
+                    "connecting_airport": route.split("-")[1],
+                    "outbound_flight": f"VJ{1200 + index}",
+                    "outbound_route": f"{route.split('-')[1]}-SGN",
+                    "passenger_count": 4 + index % 6,
+                    "scheduled_connection_minutes": 115,
+                    "protected_if_arrival_delay_under_minutes": 60,
+                    "misconnect_cost_usd_per_passenger": 80,
+                }
+            )
+    for item in data["weather_feed"]["airport_forecasts"][0]["hourly_risk"]:
+        item["arrival_capacity_per_hour"] = max(6, item["arrival_capacity_per_hour"] - 2)
+        item["departure_capacity_per_hour"] = max(8, item["departure_capacity_per_hour"] - 3)
 
 
 @st.cache_data
@@ -937,6 +1088,17 @@ def build_dashboard_html(data: dict[str, Any], decision: dict[str, Any]) -> str:
     outcome = decision["projected_outcome"]
     payload = decision["explainability_payload"]
     logo_src = load_logo_data_uri()
+    status_label = data["scenario"].get("status_label", "Typhoon risk near SGN")
+    scenario_summary = data["scenario"].get(
+        "summary",
+        "SGN capacity drops sharply from 08:00 as thunderstorm, windshear and flow-control risk build.",
+    )
+    data_scope = (
+        f"{len(data['scheduled_flights'])} flights | "
+        f"{len(data['fleet'])} aircraft | "
+        f"{len(data['crew_rosters'])} crews | "
+        f"{len(data['passenger_connections'])} connection groups"
+    )
 
     metrics = [
         ("Confidence", f"{decision['confidence']:.0%}"),
@@ -1080,8 +1242,8 @@ def build_dashboard_html(data: dict[str, Any], decision: dict[str, Any]) -> str:
                     </div>
                 </div>
                 <div>
-                    <div class="status-pill">Typhoon risk near SGN</div>
-                    <p class="status-sub">Snapshot {esc(snapshot[11:16])} ICT | 6-hour planning horizon</p>
+                    <div class="status-pill">{esc(status_label)}</div>
+                    <p class="status-sub">Snapshot {esc(snapshot[11:16])} ICT | 6-hour horizon | {esc(data_scope)}</p>
                 </div>
             </div>
 
@@ -1093,7 +1255,7 @@ def build_dashboard_html(data: dict[str, Any], decision: dict[str, Any]) -> str:
                     </div>
                     <div class="card">
                         <h2>Weather And NOTAM Risk</h2>
-                        <div class="muted">SGN capacity drops sharply from 08:00 as thunderstorm, windshear and flow-control risk build.</div>
+                        <div class="muted">{esc(scenario_summary)}</div>
                         <div class="weather-strip">{weather_html}</div>
                         <div class="flight-note">Active constraints: ATFM flow management, lightning ramp-stop risk, taxiway W4 closure.</div>
                     </div>
@@ -1180,9 +1342,15 @@ def main() -> None:
         layout="wide",
     )
 
-    data = load_demo_data()
-    decision = run_agents(data)
     inject_styles()
+    selected_scenario = st.selectbox(
+        "Scenario",
+        options=list(SCENARIO_OPTIONS),
+        format_func=lambda key: SCENARIO_OPTIONS[key],
+        index=0,
+    )
+    data = load_scenario(selected_scenario)
+    decision = run_agents(data)
     render_dashboard(data, decision)
 
 

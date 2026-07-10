@@ -28,6 +28,13 @@ streamlit run app.py
 
 The first demo dataset is in `demo-data/flightops-ai-typhoon-sgn-2026-07-12.json`.
 
+The app includes a scenario dropdown with four demo cases:
+
+- Typhoon approaching SGN
+- Lightning ramp stop at SGN
+- Maintenance cascade at SGN
+- High-volume network stress
+
 ### Assets
 
 The VietJet Air logo in `assets/vietjet-air-logo.svg` is sourced from Wikimedia Commons:
