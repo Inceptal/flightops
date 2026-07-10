@@ -365,18 +365,64 @@ def inject_styles() -> None:
             font-size: 0.8rem;
             margin-top: 0.5rem;
         }
+        .section-title {
+            border: 1px solid var(--panel-border);
+            border-radius: 8px 8px 0 0;
+            background: var(--panel);
+            border-bottom: 0;
+            padding: 0.85rem 1rem 0.25rem;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+        }
+        .section-title h2 {
+            margin: 0;
+            font-size: 1.05rem;
+            letter-spacing: 0;
+        }
+        .table-note {
+            border: 1px solid var(--panel-border);
+            border-top: 0;
+            border-radius: 0 0 8px 8px;
+            background: var(--panel);
+            padding: 0.2rem 1rem 0.75rem;
+            color: var(--muted);
+            font-size: 0.8rem;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+        }
+        .agents-title {
+            margin-top: 0.75rem;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            background: var(--panel);
+            padding: 0.85rem 1rem;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+        }
+        .agents-title h2 {
+            margin: 0;
+            font-size: 1.05rem;
+        }
+        @media (max-width: 900px) {
+            div[data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap;
+            }
+            div[data-testid="column"] {
+                width: 100% !important;
+                flex: 1 1 100% !important;
+            }
+            .topbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+            .metric-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .metric-value {
+                font-size: 1.2rem;
+            }
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
-
-
-def card_open(extra_class: str = "") -> None:
-    st.markdown(f'<div class="card {extra_class}">', unsafe_allow_html=True)
-
-
-def card_close() -> None:
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_topbar(data: dict[str, Any]) -> None:
@@ -472,7 +518,7 @@ def render_recommendation(decision: dict[str, Any]) -> None:
 
 
 def render_agents(decision: dict[str, Any]) -> None:
-    st.markdown('<div class="card"><h2>Specialist Agents</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="agents-title"><h2>Specialist Agents</h2></div>', unsafe_allow_html=True)
     cols = st.columns(5)
     for index, finding in enumerate(decision["agent_findings"]):
         label = AGENT_LABELS[finding["agent"]]
@@ -492,7 +538,6 @@ def render_agents(decision: dict[str, Any]) -> None:
                 """,
                 unsafe_allow_html=True,
             )
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_why(decision: dict[str, Any]) -> None:
@@ -540,7 +585,7 @@ def main() -> None:
 
     with center_col:
         render_recommendation(decision)
-        st.markdown('<div class="card"><h2>Affected Flights</h2>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title"><h2>Affected Flights</h2></div>', unsafe_allow_html=True)
         flights = flight_table(data)
         st.dataframe(
             style_flight_table(flights),
@@ -548,7 +593,10 @@ def main() -> None:
             hide_index=True,
             height=220,
         )
-        st.markdown('<div class="flight-note">Focused morning wave for the 2-3 minute demo.</div></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="table-note">Focused morning wave for the 2-3 minute demo.</div>',
+            unsafe_allow_html=True,
+        )
 
     with right_col:
         render_why(decision)
