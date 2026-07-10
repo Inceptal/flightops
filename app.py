@@ -935,6 +935,163 @@ def inject_styles() -> None:
             line-height: 1.42;
             white-space: pre-wrap;
         }
+        .event-list {
+            display: grid;
+            gap: 0.55rem;
+        }
+        .event-item {
+            display: grid;
+            grid-template-columns: 3.05rem 1fr;
+            gap: 0.6rem;
+            align-items: start;
+            padding-top: 0.56rem;
+            border-top: 1px solid #e4e9f1;
+        }
+        .event-item:first-child {
+            border-top: 0;
+            padding-top: 0;
+        }
+        .event-time {
+            color: var(--text);
+            font-size: 0.78rem;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+        }
+        .event-head {
+            display: flex;
+            align-items: center;
+            gap: 0.34rem;
+            color: var(--text);
+            font-size: 0.8rem;
+            font-weight: 900;
+        }
+        .event-dot {
+            width: 0.48rem;
+            height: 0.48rem;
+            border-radius: 999px;
+            background: var(--slate);
+            flex: 0 0 auto;
+        }
+        .event-dot.red {
+            background: var(--red);
+        }
+        .event-dot.blue {
+            background: var(--blue);
+        }
+        .event-dot.purple {
+            background: var(--purple);
+        }
+        .event-dot.amber {
+            background: var(--amber);
+        }
+        .event-dot.green {
+            background: var(--green);
+        }
+        .event-text {
+            color: var(--muted);
+            font-size: 0.78rem;
+            line-height: 1.32;
+            margin-top: 0.08rem;
+        }
+        .control-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.55rem;
+            padding-top: 0.62rem;
+            border-top: 1px solid #dceee5;
+        }
+        .control-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.36rem;
+            min-height: 2.35rem;
+            border: 1px solid #d9e2ec;
+            border-radius: 8px;
+            background: #ffffff;
+            color: var(--text);
+            font-size: 0.82rem;
+            font-weight: 900;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+        .control-button.approve {
+            border-color: #bfe7d5;
+            background: #eafaf2;
+            color: #126044;
+        }
+        .control-button.simulate {
+            border-color: #c8daf4;
+            background: #edf5ff;
+            color: #235aa6;
+        }
+        .control-button.reject {
+            border-color: #f4c6c6;
+            background: #fff1f1;
+            color: #9f1218;
+        }
+        .control-icon {
+            display: grid;
+            place-items: center;
+            width: 1.05rem;
+            height: 1.05rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.72);
+            font-size: 0.76rem;
+            line-height: 1;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+        .comparison-table th {
+            color: var(--muted);
+            font-size: 0.7rem;
+            text-align: left;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            padding: 0.46rem 0.34rem;
+            border-bottom: 1px solid #e4e9f1;
+            white-space: nowrap;
+        }
+        .comparison-table td {
+            padding: 0.56rem 0.34rem;
+            border-bottom: 1px solid #edf1f5;
+            vertical-align: top;
+            font-weight: 700;
+        }
+        .comparison-table tr:last-child td {
+            border-bottom: 0;
+        }
+        .comparison-table .recommended-row td {
+            background: #f5fff9;
+            color: #126044;
+            font-weight: 900;
+        }
+        .comparison-table .recommended-row td:first-child {
+            border-radius: 8px 0 0 8px;
+        }
+        .comparison-table .recommended-row td:last-child {
+            border-radius: 0 8px 8px 0;
+        }
+        .ops-brief {
+            border-left: 5px solid #2663b8;
+            background: linear-gradient(180deg, #ffffff 0%, #f6faff 100%);
+        }
+        .consensus-item {
+            display: grid;
+            grid-template-columns: 1.85rem 1fr;
+            gap: 0.55rem;
+            align-items: start;
+            padding-top: 0.52rem;
+            border-top: 1px solid #e4e9f1;
+        }
+        .consensus-item:first-child {
+            padding-top: 0;
+            border-top: 0;
+        }
         @media (max-width: 900px) {
             .cockpit-grid, .agent-grid {
                 grid-template-columns: 1fr;
@@ -965,8 +1122,14 @@ def inject_styles() -> None:
             .before-after {
                 grid-template-columns: 1fr;
             }
+            .control-row {
+                grid-template-columns: 1fr;
+            }
             .flight-table {
                 min-width: 640px;
+            }
+            .comparison-table {
+                min-width: 430px;
             }
         }
         </style>
@@ -1124,6 +1287,79 @@ def risk_pill(value: str) -> str:
     return f'<span class="pill pill-{esc(value.lower())}">{esc(value)}</span>'
 
 
+def action_title(action: dict[str, Any]) -> str:
+    if action["type"] == "aircraft_swap":
+        return f"Swap {action['flight']} onto {action['to_tail']}"
+    if action["type"] == "controlled_delay":
+        return f"Delay {action['flight']} by {action['delay_minutes']} min"
+    if action["type"] == "gate_change":
+        return f"Move {action['flight']} to {action['to_resource']}"
+    if action["type"] == "ground_hold":
+        return f"Hold {action['flight']} for {action['hold_minutes']} min"
+    if action["type"] == "maintenance_protection":
+        return f"Protect {action['tail']} for maintenance"
+    if action["type"] == "crew_reallocation":
+        return f"Reassign {action['flight']} to {action['to_crew']}"
+    if action["type"] == "capacity_rebalance":
+        return f"Prioritize {action['flight_bank']}"
+    return action["type"].replace("_", " ").title()
+
+
+def action_dot_class(action_type: str) -> str:
+    if action_type in {"controlled_delay", "ground_hold", "maintenance_protection"}:
+        return " delay"
+    if action_type in {"gate_change", "crew_reallocation"}:
+        return " gate"
+    return ""
+
+
+def monitor_events(data: dict[str, Any], decision: dict[str, Any]) -> list[tuple[str, str, str, str]]:
+    first_action = action_title(decision["recommended_actions"][0])
+    scenario_key = data["scenario"].get("selected_key", "sgn_typhoon")
+    scenario_event = {
+        "sgn_typhoon": "Typhoon track update increases SGN flow-control probability.",
+        "sgn_lightning": "Lightning cells trigger remote-stand handling risk alert.",
+        "sgn_maintenance": "New maintenance constraint detected on VN-A152 rotation.",
+        "sgn_network_stress": "Morning bank exceeds reduced SGN capacity threshold.",
+    }.get(scenario_key, "Operational disruption signal detected.")
+    return [
+        ("05:40", "Weather", scenario_event, "red"),
+        ("05:42", "Maintenance", "Aircraft constraints checked against storm-window dispatch.", "amber"),
+        ("05:44", "Crew", "Reserve crew coverage confirmed for the lower-cost delay candidate.", "purple"),
+        ("05:45", "Supervisor", f"Recommendation package opened: {first_action}.", "blue"),
+        (
+            "05:46",
+            "Cost",
+            f"Impact model estimates US${decision['projected_outcome']['total_estimated_savings_usd']:,} avoidable disruption.",
+            "green",
+        ),
+    ]
+
+
+def impact_options(decision: dict[str, Any]) -> list[dict[str, Any]]:
+    outcome = decision["projected_outcome"]
+    ai_cost = max(4200, outcome["total_estimated_savings_usd"] - 10500)
+    return [
+        {"option": "Do nothing", "delay": 138, "misconnects": 41, "cost": ai_cost + outcome["total_estimated_savings_usd"]},
+        {"option": "Delay protected flight", "delay": 96, "misconnects": 17, "cost": ai_cost + 9400},
+        {"option": "AI recommendation", "delay": 42, "misconnects": outcome["misconnections_prevented"], "cost": ai_cost},
+    ]
+
+
+def agent_consensus_items(decision: dict[str, Any]) -> list[tuple[str, str, str]]:
+    actions = decision["recommended_actions"]
+    first = action_title(actions[0])
+    second = action_title(actions[1])
+    third = action_title(actions[2])
+    return [
+        ("weather_agent", "Weather", "Prioritize moves before the highest-risk SGN capacity window."),
+        ("aircraft_agent", "Aircraft", f"Supports: {first}."),
+        ("crew_agent", "Crew", "Reserve coverage is available for the shifted disruption."),
+        ("maintenance_agent", "Maintenance", "Avoids dispatching aircraft with narrow engineering buffers."),
+        ("cost_impact_agent", "Cost", f"Best package: {first}; {second}; {third}."),
+    ]
+
+
 def build_dashboard_html(
     data: dict[str, Any], decision: dict[str, Any], llm_briefing: dict[str, Any]
 ) -> str:
@@ -1171,30 +1407,8 @@ def build_dashboard_html(
 
     action_html = []
     for action in decision["recommended_actions"][:3]:
-        if action["type"] == "aircraft_swap":
-            title = f"Swap {action['flight']} onto {action['to_tail']}"
-            dot_class = ""
-        elif action["type"] == "controlled_delay":
-            title = f"Delay {action['flight']} by {action['delay_minutes']} min"
-            dot_class = " delay"
-        elif action["type"] == "gate_change":
-            title = f"Move {action['flight']} to {action['to_resource']}"
-            dot_class = " gate"
-        elif action["type"] == "ground_hold":
-            title = f"Hold {action['flight']} for {action['hold_minutes']} min"
-            dot_class = " delay"
-        elif action["type"] == "maintenance_protection":
-            title = f"Protect {action['tail']} for maintenance"
-            dot_class = " delay"
-        elif action["type"] == "crew_reallocation":
-            title = f"Reassign {action['flight']} to {action['to_crew']}"
-            dot_class = " gate"
-        elif action["type"] == "capacity_rebalance":
-            title = f"Prioritize {action['flight_bank']}"
-            dot_class = ""
-        else:
-            title = action["type"].replace("_", " ").title()
-            dot_class = ""
+        title = action_title(action)
+        dot_class = action_dot_class(action["type"])
         action_html.append(
             f"""
             <div class="action-row">
@@ -1206,6 +1420,45 @@ def build_dashboard_html(
             </div>
             """
         )
+
+    monitor_html = "".join(
+        f"""
+        <div class="event-item">
+            <div class="event-time">{esc(time)}</div>
+            <div class="event-body">
+                <div class="event-head"><span class="event-dot {esc(color)}"></span>{esc(source)} Agent</div>
+                <div class="event-text">{esc(text)}</div>
+            </div>
+        </div>
+        """
+        for time, source, text, color in monitor_events(data, decision)
+    )
+
+    impact_rows_html = "".join(
+        f"""
+        <tr class="{'recommended-row' if item['option'] == 'AI recommendation' else ''}">
+            <td>{esc(item['option'])}</td>
+            <td>{esc(item['delay'])} min</td>
+            <td>{esc(item['misconnects'])}</td>
+            <td>US${item['cost']:,}</td>
+        </tr>
+        """
+        for item in impact_options(decision)
+    )
+
+    control_html = "".join(
+        f"""
+        <button class="control-button {button_class}" type="button">
+            <span class="control-icon">{icon}</span>
+            <span>{label}</span>
+        </button>
+        """
+        for label, icon, button_class in [
+            ("Approve", "&check;", "approve"),
+            ("Simulate", "&#8635;", "simulate"),
+            ("Reject", "&times;", "reject"),
+        ]
+    )
 
     flight_rows = []
     for row in flight_table(data).to_dict("records"):
@@ -1286,6 +1539,23 @@ def build_dashboard_html(
         """
         for agent, title, detail in trace_items
     )
+    consensus_html = "".join(
+        f"""
+        <div class="consensus-item">
+            <span class="icon-badge {AGENT_ACCENTS[agent]}">{AGENT_ICONS[agent]}</span>
+            <div>
+                <p class="trace-title">{esc(title)}</p>
+                <p class="trace-detail">{esc(detail)}</p>
+            </div>
+        </div>
+        """
+        for agent, title, detail in agent_consensus_items(decision)
+    )
+    ops_brief = (
+        f"Recommendation package ready for duty manager approval. {decision['headline']} "
+        f"Estimated savings: US${outcome['total_estimated_savings_usd']:,}. "
+        f"Confidence: {decision['confidence']:.0%}. Residual risk: {outcome['residual_risk']}"
+    )
     llm_enabled = llm_briefing["enabled"]
     llm_badge = (
         f"Claude via AWS Bedrock" if llm_enabled else "Fallback briefing"
@@ -1322,6 +1592,10 @@ def build_dashboard_html(
                         <div class="weather-strip">{weather_html}</div>
                         <div class="flight-note">Active constraints: ATFM flow management, lightning ramp-stop risk, taxiway W4 closure.</div>
                     </div>
+                    <div class="card monitor-card">
+                        <h2>Autonomous Monitor</h2>
+                        <div class="event-list">{monitor_html}</div>
+                    </div>
                 </div>
 
                 <div class="stack decision-stack">
@@ -1331,6 +1605,7 @@ def build_dashboard_html(
                             <span class="recommended-label">Recommended</span>
                         </div>
                         {''.join(action_html)}
+                        <div class="control-row">{control_html}</div>
                         <div class="before-after">
                             <div class="impact-cell">
                                 <div class="impact-label">Misconnects</div>
@@ -1345,6 +1620,20 @@ def build_dashboard_html(
                                 <div class="impact-change"><span class="before">US$25.9k</span><span>&rarr;</span><span class="after">US$7.7k</span></div>
                             </div>
                         </div>
+                    </div>
+                    <div class="card">
+                        <h2>Scenario Impact Comparison</h2>
+                        <table class="comparison-table">
+                            <thead>
+                                <tr>
+                                    <th>Option</th>
+                                    <th>Delay</th>
+                                    <th>Misconnects</th>
+                                    <th>Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>{impact_rows_html}</tbody>
+                        </table>
                     </div>
                     <div class="card">
                         <h2>Affected Flights</h2>
@@ -1377,10 +1666,21 @@ def build_dashboard_html(
                         </div>
                         <div class="briefing-text">{esc(llm_briefing['text'])}</div>
                     </div>
+                    <div class="card ops-brief">
+                        <div class="ai-head">
+                            <h2>Duty Manager Brief</h2>
+                            <span class="ai-badge off">Copy-ready</span>
+                        </div>
+                        <div class="briefing-text">{esc(ops_brief)}</div>
+                    </div>
                     <div class="card">
                         <h2>Ops Manager asks: Why?</h2>
                         <div class="muted">{esc(payload['short_answer'])}</div>
                         {''.join(why_html)}
+                    </div>
+                    <div class="card">
+                        <h2>Agent Consensus</h2>
+                        <div class="trace-list">{consensus_html}</div>
                     </div>
                     <div class="card">
                         <h2>Decision Trace</h2>
