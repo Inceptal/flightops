@@ -1093,7 +1093,7 @@ def inject_styles() -> None:
         }
         .cockpit-grid {
             display: grid;
-            grid-template-columns: minmax(270px, 0.82fr) minmax(500px, 1.48fr) minmax(430px, 1.2fr);
+            grid-template-columns: minmax(300px, 0.78fr) minmax(620px, 1.62fr);
             gap: 0.85rem;
             align-items: start;
         }
@@ -1109,8 +1109,17 @@ def inject_styles() -> None:
         .decision-stack {
             order: 2;
         }
-        .why-stack {
-            order: 3;
+        .briefing-grid,
+        .analysis-grid {
+            display: grid;
+            gap: 0.85rem;
+            align-items: start;
+        }
+        .briefing-grid {
+            grid-template-columns: minmax(560px, 1.45fr) minmax(360px, 0.9fr);
+        }
+        .analysis-grid {
+            grid-template-columns: minmax(420px, 1.15fr) minmax(320px, 0.9fr) minmax(320px, 0.9fr);
         }
         .flight-table {
             width: 100%;
@@ -1450,24 +1459,15 @@ def inject_styles() -> None:
             border-top: 0;
         }
         @media (max-width: 1180px) {
-            .cockpit-grid {
-                grid-template-columns: minmax(260px, 0.9fr) minmax(460px, 1.35fr);
-            }
-            .why-stack {
-                grid-column: 1 / -1;
-                display: grid;
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-            .ai-briefing {
-                grid-column: 1 / -1;
+            .cockpit-grid,
+            .briefing-grid,
+            .analysis-grid {
+                grid-template-columns: 1fr;
             }
         }
         @media (max-width: 900px) {
-            .cockpit-grid, .agent-grid, .insight-grid, .why-stack {
+            .cockpit-grid, .agent-grid, .insight-grid, .briefing-grid, .analysis-grid {
                 grid-template-columns: 1fr;
-            }
-            .why-stack {
-                display: flex;
             }
             .decision-stack {
                 order: 1;
@@ -2900,30 +2900,38 @@ def build_dashboard_html(
                     </div>
                 </div>
 
-                <div class="stack why-stack">
-                    <div class="card ai-briefing">
-                        <div class="ai-head">
-                            <h2>LLM Ops Briefing</h2>
-                            <span class="{llm_badge_class}">{esc(llm_badge)}</span>
-                        </div>
-                        <div class="briefing-text">{markdown_to_html(llm_briefing['text'])}</div>
+            </div>
+
+            <div class="briefing-grid">
+                <div class="card ai-briefing">
+                    <div class="ai-head">
+                        <h2>LLM Ops Briefing</h2>
+                        <span class="{llm_badge_class}">{esc(llm_badge)}</span>
                     </div>
-                    <div class="card ops-brief">
-                        <div class="ai-head">
-                            <h2>Duty Manager Brief</h2>
-                            <span class="ai-badge off">Copy-ready</span>
-                        </div>
-                        <div class="briefing-text"><p>{esc(ops_brief)}</p></div>
+                    <div class="briefing-text">{markdown_to_html(llm_briefing['text'])}</div>
+                </div>
+                <div class="card ops-brief">
+                    <div class="ai-head">
+                        <h2>Duty Manager Brief</h2>
+                        <span class="ai-badge off">Copy-ready</span>
                     </div>
-                    <div class="card">
-                        <h2>Ops Manager asks: Why?</h2>
-                        <div class="muted">{esc(payload['short_answer'])}</div>
-                        {''.join(why_html)}
-                    </div>
-                    <div class="card">
-                        <h2>Agent Consensus</h2>
-                        <div class="trace-list">{consensus_html}</div>
-                    </div>
+                    <div class="briefing-text"><p>{esc(ops_brief)}</p></div>
+                </div>
+            </div>
+
+            <div class="analysis-grid">
+                <div class="card">
+                    <h2>Ops Manager asks: Why?</h2>
+                    <div class="muted">{esc(payload['short_answer'])}</div>
+                    {''.join(why_html)}
+                </div>
+                <div class="card">
+                    <h2>Agent Consensus</h2>
+                    <div class="trace-list">{consensus_html}</div>
+                </div>
+                <div class="card">
+                    <h2>Decision Trace</h2>
+                    <div class="trace-list">{trace_html}</div>
                 </div>
             </div>
 
@@ -2931,15 +2939,9 @@ def build_dashboard_html(
                 <h2>Specialist Agents</h2>
                 <div class="agent-grid">{''.join(agent_html)}</div>
             </div>
-            <div class="insight-grid">
-                <div class="card">
-                    <h2>Rejected Alternatives</h2>
-                    <div class="alternatives-list">{alternatives_html}</div>
-                </div>
-                <div class="card">
-                    <h2>Decision Trace</h2>
-                    <div class="trace-list">{trace_html}</div>
-                </div>
+            <div class="card">
+                <h2>Rejected Alternatives</h2>
+                <div class="alternatives-list">{alternatives_html}</div>
             </div>
         </div>
         """
