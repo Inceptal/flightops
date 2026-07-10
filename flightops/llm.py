@@ -132,6 +132,12 @@ class LLMExplanationAgent:
                 recommended_actions.append(f"Reassign {action['flight']} to {action['to_crew']}")
             elif action["type"] == "capacity_rebalance":
                 recommended_actions.append(f"Prioritize {action['flight_bank']}")
+            elif action["type"] == "departure_metering":
+                recommended_actions.append(f"Meter {action['flight_bank']}")
+            elif action["type"] == "passenger_protection":
+                recommended_actions.append(f"Protect {action['connection_groups']} connection groups")
+            elif action["type"] == "recovery_buffer":
+                recommended_actions.append(f"Add {action['buffer_minutes']} minute recovery buffers")
 
         return {
             "scenario": {

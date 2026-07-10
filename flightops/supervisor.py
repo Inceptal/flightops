@@ -257,7 +257,33 @@ class SupervisorAgent:
                     "condition": "Execute if VJ237 slips behind the protected HAN departure queue.",
                 },
                 base[2] | {"priority": 4, "action_id": "ACT-004"},
-                base[4],
+                base[4] | {"priority": 5, "action_id": "ACT-005"},
+                {
+                    "action_id": "ACT-006",
+                    "type": "departure_metering",
+                    "priority": 6,
+                    "flight_bank": "SGN domestic wave 06:30-09:30",
+                    "release_rate": "8 departures per 30 minutes",
+                    "reason": "The high-volume bank needs controlled release spacing to avoid queue collapse at the reduced departure capacity.",
+                    "operational_effect": "Keeps short-haul departures moving while protecting the trunk-bank priority queue.",
+                },
+                {
+                    "action_id": "ACT-007",
+                    "type": "passenger_protection",
+                    "priority": 7,
+                    "connection_groups": 13,
+                    "reason": "Connection groups should be pre-protected before the delay wave reaches HAN, DAD and CXR outbound banks.",
+                    "operational_effect": "Pre-authorizes reaccommodation and voucher handling for passengers most likely to misconnect.",
+                },
+                {
+                    "action_id": "ACT-008",
+                    "type": "recovery_buffer",
+                    "priority": 8,
+                    "resource": "VN-B700 to VN-B717 rotations",
+                    "buffer_minutes": 18,
+                    "reason": "The monitored narrow-body rotations need recovery buffers to keep the afternoon bank from inheriting the morning disruption.",
+                    "operational_effect": "Adds small planned buffers to lower-priority rotations instead of letting delays propagate unmanaged.",
+                },
             ]
         return base
 
@@ -279,6 +305,12 @@ class SupervisorAgent:
             return f"Hold {action['flight']} for {action['hold_minutes']} minutes"
         if action["type"] == "capacity_rebalance":
             return f"Prioritize {action['flight_bank']}"
+        if action["type"] == "departure_metering":
+            return f"Meter {action['flight_bank']}"
+        if action["type"] == "passenger_protection":
+            return f"Protect {action['connection_groups']} connection groups"
+        if action["type"] == "recovery_buffer":
+            return f"Add {action['buffer_minutes']} min recovery buffers"
         return action["type"].replace("_", " ").title()
 
     def _confidence(self, findings: list[AgentFinding]) -> float:

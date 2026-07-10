@@ -33,6 +33,15 @@ class ScenarioVariantTests(unittest.TestCase):
         self.assertGreaterEqual(len(data["fleet"]), 20)
         self.assertGreaterEqual(len(data["crew_rosters"]), 20)
 
+    def test_network_stress_scenario_has_full_action_package(self) -> None:
+        data = load_scenario("sgn_network_stress")
+        decision = run_agents(data)
+        action_types = {action["type"] for action in decision["recommended_actions"]}
+        self.assertGreaterEqual(len(decision["recommended_actions"]), 8)
+        self.assertIn("departure_metering", action_types)
+        self.assertIn("passenger_protection", action_types)
+        self.assertIn("recovery_buffer", action_types)
+
 
 if __name__ == "__main__":
     unittest.main()

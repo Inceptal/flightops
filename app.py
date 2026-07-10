@@ -492,6 +492,57 @@ def inject_styles() -> None:
             line-height: 1.34;
             overflow-wrap: break-word;
         }
+        .action-subhead {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.6rem;
+            margin-top: 0.72rem;
+            padding-top: 0.72rem;
+            border-top: 1px solid #dceee5;
+        }
+        .action-subhead h3 {
+            margin: 0;
+            font-size: 0.86rem;
+        }
+        .action-count {
+            color: #126044;
+            font-size: 0.72rem;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+        .secondary-actions {
+            display: grid;
+            gap: 0.42rem;
+            margin-top: 0.48rem;
+        }
+        .secondary-action {
+            display: grid;
+            grid-template-columns: 1.5rem 1fr;
+            gap: 0.52rem;
+            align-items: start;
+            border: 1px solid #dbe8e2;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.74);
+            padding: 0.5rem;
+        }
+        .secondary-action .step-dot {
+            width: 1.25rem;
+            height: 1.25rem;
+            font-size: 0.68rem;
+        }
+        .secondary-title {
+            margin: 0;
+            color: var(--text);
+            font-size: 0.8rem;
+            font-weight: 900;
+        }
+        .secondary-reason {
+            margin: 0.08rem 0 0;
+            color: var(--muted);
+            font-size: 0.74rem;
+            line-height: 1.25;
+        }
         .before-after {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1302,14 +1353,22 @@ def action_title(action: dict[str, Any]) -> str:
         return f"Reassign {action['flight']} to {action['to_crew']}"
     if action["type"] == "capacity_rebalance":
         return f"Prioritize {action['flight_bank']}"
+    if action["type"] == "departure_metering":
+        return f"Meter {action['flight_bank']}"
+    if action["type"] == "passenger_protection":
+        return f"Protect {action['connection_groups']} connection groups"
+    if action["type"] == "recovery_buffer":
+        return f"Add {action['buffer_minutes']} min recovery buffers"
     return action["type"].replace("_", " ").title()
 
 
 def action_dot_class(action_type: str) -> str:
     if action_type in {"controlled_delay", "ground_hold", "maintenance_protection"}:
         return " delay"
-    if action_type in {"gate_change", "crew_reallocation"}:
+    if action_type in {"gate_change", "crew_reallocation", "departure_metering", "recovery_buffer"}:
         return " gate"
+    if action_type == "passenger_protection":
+        return " delay"
     return ""
 
 
@@ -1405,8 +1464,10 @@ def build_dashboard_html(
         for item in forecast
     )
 
+    primary_actions = decision["recommended_actions"][:3]
+    secondary_actions = decision["recommended_actions"][3:]
     action_html = []
-    for action in decision["recommended_actions"][:3]:
+    for action in primary_actions:
         title = action_title(action)
         dot_class = action_dot_class(action["type"])
         action_html.append(
@@ -1420,6 +1481,29 @@ def build_dashboard_html(
             </div>
             """
         )
+    secondary_action_html = "".join(
+        f"""
+        <div class="secondary-action">
+            <div class="step-dot{action_dot_class(action['type'])}">{esc(action['priority'])}</div>
+            <div>
+                <p class="secondary-title">{esc(action_title(action))}</p>
+                <p class="secondary-reason">{esc(action['reason'])}</p>
+            </div>
+        </div>
+        """
+        for action in secondary_actions
+    )
+    secondary_block = (
+        f"""
+        <div class="action-subhead">
+            <h3>Secondary Actions</h3>
+            <span class="action-count">{len(secondary_actions)} execution actions</span>
+        </div>
+        <div class="secondary-actions">{secondary_action_html}</div>
+        """
+        if secondary_actions
+        else ""
+    )
 
     monitor_html = "".join(
         f"""
@@ -1601,10 +1685,11 @@ def build_dashboard_html(
                 <div class="stack decision-stack">
                     <div class="card recommendation">
                         <div class="rec-head">
-                            <h2>Supervisor Recommendation</h2>
-                            <span class="recommended-label">Recommended</span>
+                            <h2>Supervisor Action Package</h2>
+                            <span class="recommended-label">{len(primary_actions)} primary | {len(secondary_actions)} secondary</span>
                         </div>
                         {''.join(action_html)}
+                        {secondary_block}
                         <div class="control-row">{control_html}</div>
                         <div class="before-after">
                             <div class="impact-cell">
