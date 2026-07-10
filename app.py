@@ -4,13 +4,13 @@ import copy
 import html
 import json
 import base64
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from flightops.llm import LLMExplanationAgent
 from flightops.supervisor import SupervisorAgent
@@ -1700,53 +1700,505 @@ def timeline_clock(elapsed_seconds: float) -> str:
     return current.isoformat()
 
 
-def initialize_timeline_state() -> None:
-    if "timeline_elapsed" not in st.session_state:
-        st.session_state.timeline_elapsed = 0.0
-    if "timeline_running" not in st.session_state:
-        st.session_state.timeline_running = False
-    if "timeline_last_tick" not in st.session_state:
-        st.session_state.timeline_last_tick = time.time()
-
-
-def update_timeline_elapsed() -> None:
-    initialize_timeline_state()
-    now = time.time()
-    if st.session_state.timeline_running:
-        delta = now - st.session_state.timeline_last_tick
-        st.session_state.timeline_elapsed = min(
-            TIMELINE_DEMO_SECONDS,
-            st.session_state.timeline_elapsed + max(0.0, delta),
-        )
-        if st.session_state.timeline_elapsed >= TIMELINE_DEMO_SECONDS:
-            st.session_state.timeline_running = False
-    st.session_state.timeline_last_tick = now
-
-
-def apply_timeline_overlay(data: dict[str, Any], elapsed_seconds: float) -> dict[str, Any]:
-    stage = timeline_stage(elapsed_seconds)
-    clock = timeline_clock(elapsed_seconds)
-    data["scenario"]["snapshot_time_local"] = clock
-    data["scenario"]["status_label"] = f"Live 12h run | {data['scenario']['status_label']}"
-    data["timeline_demo"] = {
-        "elapsed_seconds": round(elapsed_seconds, 1),
-        "progress": min(1.0, elapsed_seconds / TIMELINE_DEMO_SECONDS),
-        "simulated_hours": round(
-            min(elapsed_seconds, TIMELINE_DEMO_SECONDS)
-            / TIMELINE_DEMO_SECONDS
-            * TIMELINE_SIMULATED_HOURS,
-            1,
+def timeline_snapshot(milestone: dict[str, Any]) -> dict[str, Any]:
+    data = load_scenario(milestone["scenario"])
+    data["scenario"]["snapshot_time_local"] = timeline_clock(milestone["second"])
+    decision = run_agents(data)
+    weather = weather_panel_details(data)
+    primary = decision["recommended_actions"][:3]
+    secondary = decision["recommended_actions"][3:]
+    return {
+        "second": milestone["second"],
+        "clock": timeline_clock(milestone["second"])[11:16],
+        "scenario": SCENARIO_OPTIONS[milestone["scenario"]],
+        "status": data["scenario"]["status_label"],
+        "event": milestone["event"],
+        "accepted": milestone["accepted"],
+        "cumulativeSavings": milestone["cumulative_savings"],
+        "flightsRecovered": milestone["flights_recovered"],
+        "acceptedCount": max(0, len(timeline_event_log(milestone["second"])) - 1),
+        "dataScope": (
+            f"{len(data['scheduled_flights'])} flights | "
+            f"{len(data['fleet'])} aircraft | "
+            f"{len(data['crew_rosters'])} crews | "
+            f"{len(data['passenger_connections'])} connection groups"
         ),
-        "clock": clock,
-        "active_event": stage["event"],
-        "current_package": stage["accepted"],
-        "cumulative_savings": stage["cumulative_savings"],
-        "flights_recovered": stage["flights_recovered"],
-        "accepted_count": max(0, len(timeline_event_log(elapsed_seconds)) - 1),
-        "events": timeline_event_log(elapsed_seconds),
-        "running": st.session_state.get("timeline_running", False),
+        "confidence": f"{decision['confidence']:.0%}",
+        "savings": f"US${milestone['cumulative_savings']:,}",
+        "misconnectionsPrevented": decision["projected_outcome"]["misconnections_prevented"],
+        "actions": [
+            {"title": action_title(action), "reason": action["reason"], "priority": action["priority"]}
+            for action in primary
+        ],
+        "secondaryActions": [
+            {"title": action_title(action), "reason": action["reason"], "priority": action["priority"]}
+            for action in secondary[:5]
+        ],
+        "agents": [
+            {
+                "agent": finding["agent"],
+                "label": AGENT_LABELS[finding["agent"]],
+                "badge": AGENT_ICON_BADGES[finding["agent"]],
+                "accent": AGENT_ACCENTS[finding["agent"]],
+                "score": f"{finding['risk_score']:.0%}",
+                "width": int(finding["risk_score"] * 100),
+                "summary": finding["summary"],
+            }
+            for finding in decision["agent_findings"]
+        ],
+        "weather": {
+            "storm": weather["storm_name"],
+            "peak": f"{weather['peak_time']} | {weather['peak_risk']}",
+            "capacity": weather["capacity"],
+            "driver": weather["peak_driver"],
+        },
+        "brief": (
+            f"Accepted: {milestone['accepted']}. Current cumulative savings are "
+            f"US${milestone['cumulative_savings']:,}, with {milestone['flights_recovered']} flights recovered."
+        ),
     }
-    return data
+
+
+def build_timeline_player_html() -> str:
+    snapshots = [timeline_snapshot(milestone) for milestone in TIMELINE_MILESTONES]
+    events = TIMELINE_MILESTONES
+    payload = json.dumps({"snapshots": snapshots, "events": events})
+    return f"""
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+    :root {{
+        --bg: #f5f7fb;
+        --panel: #ffffff;
+        --line: #dfe5ee;
+        --text: #111827;
+        --muted: #667085;
+        --red: #d71920;
+        --blue: #2663b8;
+        --green: #14845b;
+        --amber: #b76800;
+        --purple: #7c55c7;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }}
+    .shell {{
+        max-width: 1480px;
+        margin: 0 auto;
+        padding: 12px;
+        display: grid;
+        gap: 12px;
+    }}
+    .topbar, .card {{
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    }}
+    .topbar {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+    }}
+    .brand {{ display: flex; align-items: center; gap: 12px; }}
+    .logo {{
+        width: 136px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border: 1px solid #f0c8c8;
+        border-radius: 8px;
+        color: #d71920;
+        font-weight: 900;
+        font-style: italic;
+    }}
+    h1, h2, h3, p {{ margin: 0; }}
+    h1 {{ font-size: 22px; line-height: 1.1; }}
+    h2 {{ font-size: 18px; margin-bottom: 10px; }}
+    h3 {{ font-size: 14px; }}
+    .muted {{ color: var(--muted); font-size: 14px; line-height: 1.4; }}
+    .status-pill {{
+        display: inline-flex;
+        padding: 7px 11px;
+        border-radius: 999px;
+        background: #fff2f2;
+        color: #9f1218;
+        border: 1px solid #f4c6c6;
+        font-weight: 900;
+        font-size: 14px;
+    }}
+    .player {{
+        border: 1px solid #c8daf4;
+        border-left: 5px solid var(--blue);
+        border-radius: 8px;
+        background: linear-gradient(180deg, #ffffff 0%, #f6faff 100%);
+        padding: 14px;
+    }}
+    .player-head {{
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 12px;
+    }}
+    .controls {{ display: flex; gap: 8px; flex-wrap: wrap; }}
+    button {{
+        border: 1px solid #c8daf4;
+        border-radius: 8px;
+        background: #edf5ff;
+        color: #235aa6;
+        font-weight: 900;
+        padding: 9px 13px;
+        cursor: pointer;
+        font: inherit;
+    }}
+    button.primary {{ background: #eafaf2; color: #126044; border-color: #bfe7d5; }}
+    .progress {{ height: 9px; border-radius: 999px; background: #e7eef8; overflow: hidden; }}
+    .progress span {{
+        display: block;
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--blue) 0%, var(--green) 100%);
+        transition: width 420ms ease;
+    }}
+    .metrics {{
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+    }}
+    .metric, .weather-cell {{
+        border: 1px solid #d8e5f6;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.8);
+        padding: 10px;
+    }}
+    .label {{
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+    }}
+    .value {{ font-size: 18px; font-weight: 900; margin-top: 2px; }}
+    .grid {{
+        display: grid;
+        grid-template-columns: minmax(280px, .86fr) minmax(420px, 1.36fr) minmax(300px, 1fr);
+        gap: 12px;
+        align-items: start;
+    }}
+    .stack {{ display: grid; gap: 12px; }}
+    .card {{ padding: 14px; }}
+    .recommendation {{
+        border-left: 5px solid var(--green);
+        background: linear-gradient(180deg, #ffffff 0%, #f5fff9 100%);
+    }}
+    .action {{
+        display: grid;
+        grid-template-columns: 32px 1fr;
+        gap: 10px;
+        padding: 10px 0;
+        border-top: 1px solid #dceee5;
+    }}
+    .action:first-of-type {{ border-top: 0; padding-top: 0; }}
+    .dot {{
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: var(--green);
+        color: #fff;
+        font-weight: 900;
+        font-size: 13px;
+    }}
+    .action-title {{ font-size: 17px; font-weight: 900; }}
+    .action-reason {{ color: var(--muted); font-size: 14px; line-height: 1.35; margin-top: 3px; }}
+    .secondary {{
+        display: grid;
+        gap: 7px;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #dceee5;
+    }}
+    .secondary-item {{
+        border: 1px solid #dbe8e2;
+        border-radius: 8px;
+        padding: 8px;
+        background: rgba(255,255,255,0.78);
+        color: var(--muted);
+        font-size: 13px;
+    }}
+    .weather-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }}
+    .agent-grid {{ display: grid; gap: 8px; }}
+    .agent {{
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        border-top: 4px solid var(--blue);
+        padding: 10px;
+        background: #fff;
+    }}
+    .agent.red {{ border-top-color: var(--red); background: #fff8f8; }}
+    .agent.blue {{ border-top-color: var(--blue); background: #f6faff; }}
+    .agent.purple {{ border-top-color: var(--purple); background: #faf7ff; }}
+    .agent.amber {{ border-top-color: var(--amber); background: #fffaf0; }}
+    .agent.green {{ border-top-color: var(--green); background: #f5fff9; }}
+    .agent-head {{ display: flex; justify-content: space-between; gap: 8px; align-items: center; }}
+    .agent-name {{ display: flex; gap: 8px; align-items: center; font-weight: 900; }}
+    .badge {{
+        width: 28px;
+        height: 28px;
+        border-radius: 7px;
+        display: grid;
+        place-items: center;
+        background: #eef2f7;
+        font-size: 11px;
+        font-weight: 900;
+    }}
+    .bar {{ height: 7px; background: #e8edf4; border-radius: 999px; overflow: hidden; margin: 8px 0; }}
+    .bar span {{ display: block; height: 100%; width: 0%; transition: width 420ms ease; background: linear-gradient(90deg, #ffc400 0%, #d71920 100%); }}
+    .events {{ display: grid; gap: 9px; }}
+    .event {{
+        display: grid;
+        grid-template-columns: 46px 1fr;
+        gap: 8px;
+        border-top: 1px solid #e4e9f1;
+        padding-top: 9px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.35;
+    }}
+    .event:first-child {{ border-top: 0; padding-top: 0; }}
+    .event-time {{ color: var(--text); font-weight: 900; }}
+    .fade {{ transition: opacity 220ms ease, transform 220ms ease; }}
+    .fade.updating {{ opacity: .45; transform: translateY(2px); }}
+    @media (max-width: 900px) {{
+        .shell {{ padding: 8px; }}
+        .topbar, .player-head {{ align-items: flex-start; flex-direction: column; }}
+        .grid {{ grid-template-columns: 1fr; }}
+        .metrics, .weather-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+        .logo {{ width: 124px; }}
+    }}
+</style>
+</head>
+<body>
+<div class="shell">
+    <div class="topbar">
+        <div class="brand">
+            <div class="logo">vietjetAir.com</div>
+            <div>
+                <h1>FlightOps AI</h1>
+                <p class="muted">Autonomous operations copilot for disruption management</p>
+            </div>
+        </div>
+        <div>
+            <div class="status-pill" id="status">Timeline demo</div>
+            <p class="muted" id="scope">12-hour autonomous operations run</p>
+        </div>
+    </div>
+
+    <div class="player">
+        <div class="player-head">
+            <div>
+                <h2>12-Hour Autonomous Ops Run</h2>
+                <p class="muted fade" id="activeEvent">Ready.</p>
+            </div>
+            <div class="controls">
+                <button class="primary" id="playBtn">Start</button>
+                <button id="pauseBtn">Pause</button>
+                <button id="resetBtn">Reset</button>
+            </div>
+        </div>
+        <div class="progress"><span id="progress"></span></div>
+        <div class="metrics">
+            <div class="metric"><div class="label">Sim Clock</div><div class="value" id="clock">05:40 ICT</div></div>
+            <div class="metric"><div class="label">Accepted Packages</div><div class="value" id="acceptedCount">0</div></div>
+            <div class="metric"><div class="label">Flights Recovered</div><div class="value" id="flightsRecovered">0</div></div>
+            <div class="metric"><div class="label">Cumulative Savings</div><div class="value" id="cumulativeSavings">US$0</div></div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="stack">
+            <div class="card">
+                <h2>Scenario Impact</h2>
+                <div class="metrics">
+                    <div class="metric"><div class="label">Confidence</div><div class="value" id="confidence">--</div></div>
+                    <div class="metric"><div class="label">Savings</div><div class="value" id="stageSavings">--</div></div>
+                    <div class="metric"><div class="label">Misconnects Prevented</div><div class="value" id="misconnections">--</div></div>
+                    <div class="metric"><div class="label">Current Package</div><div class="value" id="package">--</div></div>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Weather And NOTAM Risk</h2>
+                <div class="weather-grid">
+                    <div class="weather-cell"><div class="label">Weather System</div><div class="value" id="weatherStorm">--</div></div>
+                    <div class="weather-cell"><div class="label">Peak Risk</div><div class="value" id="weatherPeak">--</div></div>
+                    <div class="weather-cell"><div class="label">Capacity Floor</div><div class="value" id="weatherCapacity">--</div></div>
+                    <div class="weather-cell"><div class="label">Main Driver</div><div class="value" id="weatherDriver">--</div></div>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Autonomous Monitor</h2>
+                <div class="events" id="events"></div>
+            </div>
+        </div>
+
+        <div class="stack">
+            <div class="card recommendation">
+                <h2>Supervisor Action Package</h2>
+                <div id="actions"></div>
+                <div class="secondary" id="secondaryActions"></div>
+            </div>
+            <div class="card">
+                <h2>Live Ops Brief</h2>
+                <p class="muted fade" id="brief"></p>
+            </div>
+        </div>
+
+        <div class="stack">
+            <div class="card">
+                <h2>Specialist Agents</h2>
+                <div class="agent-grid" id="agents"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+const DATA = {payload};
+const duration = {TIMELINE_DEMO_SECONDS};
+let elapsed = 0;
+let running = false;
+let timer = null;
+let activeIndex = -1;
+
+const money = (value) => "US$" + value.toLocaleString();
+const byId = (id) => document.getElementById(id);
+
+function stageFor(second) {{
+    let current = DATA.snapshots[0];
+    for (const snapshot of DATA.snapshots) {{
+        if (second >= snapshot.second) current = snapshot;
+    }}
+    return current;
+}}
+
+function indexFor(second) {{
+    let idx = 0;
+    DATA.snapshots.forEach((snapshot, i) => {{
+        if (second >= snapshot.second) idx = i;
+    }});
+    return idx;
+}}
+
+function setText(id, value) {{
+    const el = byId(id);
+    if (el.textContent !== String(value)) {{
+        el.classList.add("updating");
+        setTimeout(() => {{
+            el.textContent = value;
+            el.classList.remove("updating");
+        }}, 120);
+    }}
+}}
+
+function render(second) {{
+    elapsed = Math.max(0, Math.min(duration, second));
+    const snapshot = stageFor(elapsed);
+    const idx = indexFor(elapsed);
+    byId("progress").style.width = Math.round(elapsed / duration * 100) + "%";
+    byId("playBtn").textContent = running ? "Running" : (elapsed > 0 && elapsed < duration ? "Resume" : "Start");
+    setText("status", snapshot.status);
+    setText("scope", "Snapshot " + snapshot.clock + " ICT | " + snapshot.dataScope);
+    setText("activeEvent", snapshot.event);
+    setText("clock", snapshot.clock + " ICT");
+    setText("acceptedCount", snapshot.acceptedCount);
+    setText("flightsRecovered", snapshot.flightsRecovered);
+    setText("cumulativeSavings", money(snapshot.cumulativeSavings));
+    setText("confidence", snapshot.confidence);
+    setText("stageSavings", snapshot.savings);
+    setText("misconnections", snapshot.misconnectionsPrevented);
+    setText("package", snapshot.accepted);
+    setText("weatherStorm", snapshot.weather.storm);
+    setText("weatherPeak", snapshot.weather.peak);
+    setText("weatherCapacity", snapshot.weather.capacity);
+    setText("weatherDriver", snapshot.weather.driver);
+    setText("brief", snapshot.brief);
+
+    if (idx !== activeIndex) {{
+        activeIndex = idx;
+        byId("actions").innerHTML = snapshot.actions.map(action => `
+            <div class="action">
+                <div class="dot">${{action.priority}}</div>
+                <div>
+                    <p class="action-title">${{action.title}}</p>
+                    <p class="action-reason">${{action.reason}}</p>
+                </div>
+            </div>
+        `).join("");
+        byId("secondaryActions").innerHTML = `<h3>Secondary Actions</h3>` + snapshot.secondaryActions.map(action => `
+            <div class="secondary-item"><strong>${{action.priority}}. ${{action.title}}</strong><br>${{action.reason}}</div>
+        `).join("");
+        byId("agents").innerHTML = snapshot.agents.map(agent => `
+            <div class="agent ${{agent.accent}}">
+                <div class="agent-head">
+                    <div class="agent-name"><span class="badge">${{agent.badge}}</span>${{agent.label}}</div>
+                    <strong>${{agent.score}}</strong>
+                </div>
+                <div class="bar"><span style="width:${{agent.width}}%"></span></div>
+                <p class="muted">${{agent.summary}}</p>
+            </div>
+        `).join("");
+    }}
+    byId("events").innerHTML = DATA.events
+        .filter(event => event.second <= elapsed)
+        .slice(-6)
+        .map(event => `<div class="event"><div class="event-time">+${{event.second}}s</div><div>${{event.event}}</div></div>`)
+        .join("");
+    if (elapsed >= duration) {{
+        running = false;
+        if (timer) clearInterval(timer);
+    }}
+}}
+
+function start() {{
+    if (elapsed >= duration) elapsed = 0;
+    if (timer) clearInterval(timer);
+    running = true;
+    const startedAt = performance.now() - elapsed * 1000;
+    timer = setInterval(() => {{
+        render((performance.now() - startedAt) / 1000);
+    }}, 250);
+    render(elapsed);
+}}
+
+function pause() {{
+    running = false;
+    if (timer) clearInterval(timer);
+    render(elapsed);
+}}
+
+byId("playBtn").addEventListener("click", start);
+byId("pauseBtn").addEventListener("click", pause);
+byId("resetBtn").addEventListener("click", () => {{
+    pause();
+    elapsed = 0;
+    activeIndex = -1;
+    render(0);
+}});
+render(0);
+</script>
+</body>
+</html>
+"""
 
 
 def build_dashboard_html(
@@ -2202,48 +2654,8 @@ def render_dashboard(
             st.caption(f"LLM fallback reason: {llm_briefing['error']}")
 
 
-def render_timeline_controls() -> None:
-    update_timeline_elapsed()
-    elapsed = st.session_state.timeline_elapsed
-    running = st.session_state.timeline_running
-    cols = st.columns([1, 1, 1, 4])
-    with cols[0]:
-        if st.button("Start", disabled=running and elapsed < TIMELINE_DEMO_SECONDS, use_container_width=True):
-            if elapsed >= TIMELINE_DEMO_SECONDS:
-                st.session_state.timeline_elapsed = 0.0
-            st.session_state.timeline_running = True
-            st.session_state.timeline_last_tick = time.time()
-            st.rerun()
-    with cols[1]:
-        label = "Pause" if running else "Resume"
-        if st.button(label, disabled=elapsed <= 0 or elapsed >= TIMELINE_DEMO_SECONDS, use_container_width=True):
-            st.session_state.timeline_running = not running
-            st.session_state.timeline_last_tick = time.time()
-            st.rerun()
-    with cols[2]:
-        if st.button("Reset", use_container_width=True):
-            st.session_state.timeline_elapsed = 0.0
-            st.session_state.timeline_running = False
-            st.session_state.timeline_last_tick = time.time()
-            st.rerun()
-    with cols[3]:
-        st.caption(
-            "Timeline demo endpoint: 12 simulated hours in 60 seconds. "
-            "Use Start/Pause/Resume while the main dashboard updates below."
-        )
-
-
 def render_timeline_demo() -> None:
-    render_timeline_controls()
-    elapsed = st.session_state.timeline_elapsed
-    stage = timeline_stage(elapsed)
-    data = apply_timeline_overlay(load_scenario(stage["scenario"]), elapsed)
-    decision = run_agents(data)
-    llm_briefing = run_llm_briefing(data, decision)
-    render_dashboard(data, decision, llm_briefing)
-    if st.session_state.timeline_running and elapsed < TIMELINE_DEMO_SECONDS:
-        time.sleep(1)
-        st.rerun()
+    components.html(build_timeline_player_html(), height=1900, scrolling=True)
 
 
 def main() -> None:
