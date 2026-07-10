@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from flightops.llm import LLMExplanationAgent
 from flightops.supervisor import SupervisorAgent
 
 
@@ -211,6 +212,11 @@ def apply_network_stress_scenario(data: dict[str, Any]) -> None:
 @st.cache_data
 def run_agents(data: dict[str, Any]) -> dict[str, Any]:
     return SupervisorAgent().decide(data)
+
+
+@st.cache_data
+def run_llm_briefing(data: dict[str, Any], decision: dict[str, Any]) -> dict[str, Any]:
+    return LLMExplanationAgent().run(data, decision).to_dict()
 
 
 @st.cache_data
@@ -894,6 +900,41 @@ def inject_styles() -> None:
             font-size: 0.78rem;
             line-height: 1.3;
         }
+        .ai-briefing {
+            border-left: 5px solid #7c55c7;
+            background: linear-gradient(180deg, #ffffff 0%, #faf7ff 100%);
+        }
+        .ai-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.55rem;
+        }
+        .ai-head h2 {
+            margin: 0;
+        }
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.55rem;
+            border-radius: 999px;
+            background: #f4efff;
+            color: #6842a6;
+            font-size: 0.72rem;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+        .ai-badge.off {
+            background: #eef2f7;
+            color: #475569;
+        }
+        .briefing-text {
+            color: var(--text);
+            font-size: 0.84rem;
+            line-height: 1.42;
+            white-space: pre-wrap;
+        }
         @media (max-width: 900px) {
             .cockpit-grid, .agent-grid {
                 grid-template-columns: 1fr;
@@ -1083,7 +1124,9 @@ def risk_pill(value: str) -> str:
     return f'<span class="pill pill-{esc(value.lower())}">{esc(value)}</span>'
 
 
-def build_dashboard_html(data: dict[str, Any], decision: dict[str, Any]) -> str:
+def build_dashboard_html(
+    data: dict[str, Any], decision: dict[str, Any], llm_briefing: dict[str, Any]
+) -> str:
     snapshot = data["scenario"]["snapshot_time_local"]
     outcome = decision["projected_outcome"]
     payload = decision["explainability_payload"]
@@ -1228,6 +1271,11 @@ def build_dashboard_html(data: dict[str, Any], decision: dict[str, Any]) -> str:
         """
         for agent, title, detail in trace_items
     )
+    llm_enabled = llm_briefing["enabled"]
+    llm_badge = (
+        f"Claude via AWS Bedrock" if llm_enabled else "Fallback briefing"
+    )
+    llm_badge_class = "ai-badge" if llm_enabled else "ai-badge off"
 
     return f"""
         <div class="dashboard-shell">
@@ -1307,6 +1355,13 @@ def build_dashboard_html(data: dict[str, Any], decision: dict[str, Any]) -> str:
                 </div>
 
                 <div class="stack why-stack">
+                    <div class="card ai-briefing">
+                        <div class="ai-head">
+                            <h2>LLM Ops Briefing</h2>
+                            <span class="{llm_badge_class}">{esc(llm_badge)}</span>
+                        </div>
+                        <div class="briefing-text">{esc(llm_briefing['text'])}</div>
+                    </div>
                     <div class="card">
                         <h2>Ops Manager asks: Why?</h2>
                         <div class="muted">{esc(payload['short_answer'])}</div>
@@ -1331,8 +1386,18 @@ def build_dashboard_html(data: dict[str, Any], decision: dict[str, Any]) -> str:
         """
 
 
-def render_dashboard(data: dict[str, Any], decision: dict[str, Any]) -> None:
-    st.markdown(build_dashboard_html(data, decision), unsafe_allow_html=True)
+def render_dashboard(
+    data: dict[str, Any], decision: dict[str, Any], llm_briefing: dict[str, Any]
+) -> None:
+    st.markdown(build_dashboard_html(data, decision, llm_briefing), unsafe_allow_html=True)
+    with st.expander("LLM evidence bundle"):
+        st.caption(
+            "The LLM briefing is grounded on this structured agent evidence. "
+            "If AWS Bedrock is not configured, the app uses the deterministic fallback briefing."
+        )
+        st.json(llm_briefing["evidence_bundle"])
+        if llm_briefing.get("error"):
+            st.caption(f"LLM fallback reason: {llm_briefing['error']}")
 
 
 def main() -> None:
@@ -1351,7 +1416,8 @@ def main() -> None:
     )
     data = load_scenario(selected_scenario)
     decision = run_agents(data)
-    render_dashboard(data, decision)
+    llm_briefing = run_llm_briefing(data, decision)
+    render_dashboard(data, decision, llm_briefing)
 
 
 if __name__ == "__main__":
