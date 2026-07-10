@@ -47,12 +47,12 @@ AGENT_ACCENTS = {
     "supervisor_agent": "blue",
 }
 AGENT_ICON_BADGES = {
-    "weather_agent": "WX",
-    "aircraft_agent": "AC",
-    "crew_agent": "CR",
-    "maintenance_agent": "MX",
+    "weather_agent": "☁",
+    "aircraft_agent": "✈",
+    "crew_agent": "◷",
+    "maintenance_agent": "⚙",
     "cost_impact_agent": "$",
-    "supervisor_agent": "SV",
+    "supervisor_agent": "✓",
 }
 AGENT_SHORT_SUMMARIES = {
     "weather_agent": "SGN capacity drops after 08:00; peak disruption at 10:00.",
@@ -121,6 +121,30 @@ TIMELINE_MILESTONES = [
         "cumulative_savings": 126400,
         "flights_recovered": 41,
     },
+]
+TIMELINE_MONITOR_EVENTS = [
+    {"second": 0, "kind": "agent", "agent": "weather_agent", "event": "Weather Agent opens typhoon disruption watch for SGN morning bank."},
+    {"second": 2, "kind": "data", "agent": "weather_agent", "event": "Live METAR update: gust front now 18 NM east-southeast of SGN."},
+    {"second": 4, "kind": "data", "agent": "aircraft_agent", "event": "Aircraft Agent ingests ADS-B positions for five active tails and checks swap eligibility."},
+    {"second": 6, "kind": "data", "agent": "crew_agent", "event": "Crew Agent validates reserve C-SGN-R12 against duty-time and type-rating rules."},
+    {"second": 8, "kind": "accepted", "agent": "supervisor_agent", "event": "Accepted package: swap VJ152, delay VJ237, move VJ152 to Gate 18."},
+    {"second": 11, "kind": "data", "agent": "cost_impact_agent", "event": "Cost Agent recalculates connection exposure: US$18.2k avoidable disruption."},
+    {"second": 14, "kind": "agent", "agent": "maintenance_agent", "event": "Maintenance Agent protects VN-A678 because radar MEL limits storm-window dispatch."},
+    {"second": 16, "kind": "agent", "agent": "weather_agent", "event": "Lightning ramp-stop warning received; remote-stand handling paused in bursts."},
+    {"second": 19, "kind": "accepted", "agent": "supervisor_agent", "event": "Accepted package: hold VJ310 for 35 min and keep VJ152 on contact gate."},
+    {"second": 22, "kind": "data", "agent": "aircraft_agent", "event": "Gate Agent confirms Gate 18 avoids remote-stand bus boarding during lightning risk."},
+    {"second": 25, "kind": "agent", "agent": "maintenance_agent", "event": "Maintenance Agent flags VN-A152 return limit and VN-A678 dispatch risk."},
+    {"second": 28, "kind": "data", "agent": "maintenance_agent", "event": "Engineering slot opened at 09:30; supervisor protects aircraft requiring rectification."},
+    {"second": 31, "kind": "accepted", "agent": "supervisor_agent", "event": "Accepted package: protect VN-A678 and assign VN-A152 to shorter SGN return rotation."},
+    {"second": 34, "kind": "data", "agent": "crew_agent", "event": "Crew Agent reallocates standby coverage to keep two trunk-bank departures legal."},
+    {"second": 36, "kind": "agent", "agent": "cost_impact_agent", "event": "High-volume bank detected: 43 flights competing for reduced SGN capacity."},
+    {"second": 39, "kind": "data", "agent": "weather_agent", "event": "NOTAM feed confirms ATFM metering and taxiway W4 closure remain active."},
+    {"second": 42, "kind": "accepted", "agent": "supervisor_agent", "event": "Accepted package: meter low-yield departures and prioritize SGN-HAN trunk bank."},
+    {"second": 45, "kind": "data", "agent": "aircraft_agent", "event": "Aircraft Agent checks downstream rotations; no protected aircraft now breaches maintenance buffer."},
+    {"second": 48, "kind": "accepted", "agent": "supervisor_agent", "event": "Accepted passenger protection package for 13 connection groups."},
+    {"second": 51, "kind": "data", "agent": "cost_impact_agent", "event": "Cost Agent updates cumulative saving to US$111.6k after connection protection."},
+    {"second": 55, "kind": "agent", "agent": "crew_agent", "event": "Crew Agent releases two reserves and preserves one crew for afternoon recovery."},
+    {"second": 60, "kind": "accepted", "agent": "supervisor_agent", "event": "12-hour run complete: recovery buffers absorbed residual disruption."},
 ]
 
 
@@ -1689,6 +1713,14 @@ def timeline_event_log(elapsed_seconds: float) -> list[dict[str, Any]]:
     ]
 
 
+def timeline_monitor_log(elapsed_seconds: float) -> list[dict[str, Any]]:
+    return [
+        event
+        for event in TIMELINE_MONITOR_EVENTS
+        if event["second"] <= elapsed_seconds
+    ]
+
+
 def timeline_clock(elapsed_seconds: float) -> str:
     simulated_minutes = int(
         min(elapsed_seconds, TIMELINE_DEMO_SECONDS)
@@ -1727,11 +1759,21 @@ def timeline_snapshot(milestone: dict[str, Any]) -> dict[str, Any]:
         "savings": f"US${milestone['cumulative_savings']:,}",
         "misconnectionsPrevented": decision["projected_outcome"]["misconnections_prevented"],
         "actions": [
-            {"title": action_title(action), "reason": action["reason"], "priority": action["priority"]}
+            {
+                "title": action_title(action),
+                "reason": action["reason"],
+                "priority": action["priority"],
+                "status": "Accepted",
+            }
             for action in primary
         ],
         "secondaryActions": [
-            {"title": action_title(action), "reason": action["reason"], "priority": action["priority"]}
+            {
+                "title": action_title(action),
+                "reason": action["reason"],
+                "priority": action["priority"],
+                "status": "Queued",
+            }
             for action in secondary[:5]
         ],
         "agents": [
@@ -1761,7 +1803,7 @@ def timeline_snapshot(milestone: dict[str, Any]) -> dict[str, Any]:
 
 def build_timeline_player_html() -> str:
     snapshots = [timeline_snapshot(milestone) for milestone in TIMELINE_MILESTONES]
-    events = TIMELINE_MILESTONES
+    events = TIMELINE_MONITOR_EVENTS
     payload = json.dumps({"snapshots": snapshots, "events": events})
     return f"""
 <!doctype html>
@@ -1908,7 +1950,38 @@ def build_timeline_player_html() -> str:
         padding: 10px 0;
         border-top: 1px solid #dceee5;
     }}
+    .action.accepted {{
+        position: relative;
+        border-radius: 8px;
+        padding: 10px;
+        margin: 0 -6px;
+        background: rgba(20, 132, 91, 0.06);
+    }}
     .action:first-of-type {{ border-top: 0; padding-top: 0; }}
+    .action-head {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }}
+    .state-pill {{
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #eafaf2;
+        color: #126044;
+        border: 1px solid #bfe7d5;
+        font-size: 11px;
+        font-weight: 900;
+        white-space: nowrap;
+    }}
+    .state-pill.queued {{
+        background: #f6f8fb;
+        color: #475467;
+        border-color: #dfe5ee;
+    }}
     .dot {{
         width: 28px;
         height: 28px;
@@ -1921,6 +1994,11 @@ def build_timeline_player_html() -> str:
         font-size: 13px;
     }}
     .action-title {{ font-size: 17px; font-weight: 900; }}
+    .action-head .action-title {{
+        flex: 1;
+        min-width: 0;
+        line-height: 1.2;
+    }}
     .action-reason {{ color: var(--muted); font-size: 14px; line-height: 1.35; margin-top: 3px; }}
     .secondary {{
         display: grid;
@@ -1960,9 +2038,16 @@ def build_timeline_player_html() -> str:
         display: grid;
         place-items: center;
         background: #eef2f7;
-        font-size: 11px;
+        font-size: 16px;
         font-weight: 900;
+        line-height: 1;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.72);
     }}
+    .agent.red .badge {{ background: #fff0f0; color: var(--red); }}
+    .agent.blue .badge {{ background: #eef5ff; color: var(--blue); }}
+    .agent.purple .badge {{ background: #f2ecff; color: var(--purple); }}
+    .agent.amber .badge {{ background: #fff5df; color: var(--amber); }}
+    .agent.green .badge {{ background: #eafaf2; color: var(--green); }}
     .bar {{ height: 7px; background: #e8edf4; border-radius: 999px; overflow: hidden; margin: 8px 0; }}
     .bar span {{ display: block; height: 100%; width: 0%; transition: width 420ms ease; background: linear-gradient(90deg, #ffc400 0%, #d71920 100%); }}
     .events {{ display: grid; gap: 9px; }}
@@ -1971,12 +2056,22 @@ def build_timeline_player_html() -> str:
         grid-template-columns: 46px 1fr;
         gap: 8px;
         border-top: 1px solid #e4e9f1;
-        padding-top: 9px;
+        padding: 9px 8px 0;
+        border-radius: 8px;
         color: var(--muted);
         font-size: 14px;
         line-height: 1.35;
     }}
     .event:first-child {{ border-top: 0; padding-top: 0; }}
+    .event.accepted {{
+        border: 1px solid #bfe7d5;
+        background: #f1fff8;
+        color: #126044;
+        padding: 8px;
+    }}
+    .event.data {{
+        background: #f8fbff;
+    }}
     .event-time {{ color: var(--text); font-weight: 900; }}
     .fade {{ transition: opacity 220ms ease, transform 220ms ease; }}
     .fade.updating {{ opacity: .45; transform: translateY(2px); }}
@@ -2108,6 +2203,14 @@ function indexFor(second) {{
     return idx;
 }}
 
+function latestEventFor(second) {{
+    let latest = DATA.events[0];
+    DATA.events.forEach((event) => {{
+        if (second >= event.second) latest = event;
+    }});
+    return latest;
+}}
+
 function setText(id, value) {{
     const el = byId(id);
     if (el.textContent !== String(value)) {{
@@ -2128,7 +2231,7 @@ function render(second) {{
     setText("status", snapshot.status);
     const liveClock = clockFor(elapsed);
     setText("scope", "Snapshot " + liveClock + " ICT | " + snapshot.dataScope);
-    setText("activeEvent", snapshot.event);
+    setText("activeEvent", latestEventFor(elapsed).event);
     setText("clock", liveClock + " ICT");
     setText("acceptedCount", snapshot.acceptedCount);
     setText("flightsRecovered", snapshot.flightsRecovered);
@@ -2146,16 +2249,22 @@ function render(second) {{
     if (idx !== activeIndex) {{
         activeIndex = idx;
         byId("actions").innerHTML = snapshot.actions.map(action => `
-            <div class="action">
+            <div class="action accepted">
                 <div class="dot">${{action.priority}}</div>
                 <div>
-                    <p class="action-title">${{action.title}}</p>
+                    <div class="action-head">
+                        <p class="action-title">${{action.title}}</p>
+                        <span class="state-pill">✓ ${{action.status}}</span>
+                    </div>
                     <p class="action-reason">${{action.reason}}</p>
                 </div>
             </div>
         `).join("");
         byId("secondaryActions").innerHTML = `<h3>Secondary Actions</h3>` + snapshot.secondaryActions.map(action => `
-            <div class="secondary-item"><strong>${{action.priority}}. ${{action.title}}</strong><br>${{action.reason}}</div>
+            <div class="secondary-item">
+                <span class="state-pill queued">${{action.status}}</span>
+                <strong>${{action.priority}}. ${{action.title}}</strong><br>${{action.reason}}
+            </div>
         `).join("");
         byId("agents").innerHTML = snapshot.agents.map(agent => `
             <div class="agent ${{agent.accent}}">
@@ -2170,8 +2279,8 @@ function render(second) {{
     }}
     byId("events").innerHTML = DATA.events
         .filter(event => event.second <= elapsed)
-        .slice(-6)
-        .map(event => `<div class="event"><div class="event-time">+${{event.second}}s</div><div>${{event.event}}</div></div>`)
+        .slice(-8)
+        .map(event => `<div class="event ${{event.kind}}"><div class="event-time">+${{event.second}}s</div><div>${{event.event}}</div></div>`)
         .join("");
     if (elapsed >= duration) {{
         running = false;
