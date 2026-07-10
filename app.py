@@ -4,6 +4,7 @@ import copy
 import html
 import json
 import base64
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -332,24 +333,44 @@ def load_logo_data_uri() -> str:
 
 
 def flight_table(data: dict[str, Any]) -> pd.DataFrame:
-    impact_by_flight = {
-        "VJ152": "Protect",
-        "VJ237": "Controlled delay",
-        "VJ205": "Inbound feed",
-        "VJ310": "Hold for MX/weather",
-        "VJ801": "Protect BKK slot",
+    scenario_key = data["scenario"].get("selected_key", "sgn_typhoon")
+    impacts = {
+        "sgn_typhoon": {
+            "VJ152": ("High", "Protect trunk connections"),
+            "VJ237": ("Medium", "Controlled delay"),
+            "VJ205": ("Medium", "Inbound feed"),
+            "VJ310": ("High", "Hold for MX/weather"),
+            "VJ801": ("High", "Protect BKK slot"),
+        },
+        "sgn_lightning": {
+            "VJ310": ("High", "Remote stand hold"),
+            "VJ152": ("Medium", "Move to Gate 16"),
+            "VJ237": ("Medium", "Short delay after ramp restart"),
+            "VJ326": ("Low", "Contact-gate departure"),
+            "VJ205": ("Medium", "Gate conflict watch"),
+        },
+        "sgn_maintenance": {
+            "VJ152": ("High", "Swap off constrained tail"),
+            "VJ310": ("High", "Engineering release hold"),
+            "VJ801": ("High", "A-check return protection"),
+            "VJ237": ("Medium", "Crew and rotation buffer"),
+            "VJ326": ("Low", "Reserve aircraft candidate"),
+        },
+        "sgn_network_stress": {
+            "VJ152": ("High", "Trunk-bank priority"),
+            "VJ237": ("Medium", "Metered departure"),
+            "VJ900": ("Low", "Low-yield slot donor"),
+            "VJ904": ("Medium", "Connection protection watch"),
+            "VJ908": ("Medium", "Recovery buffer"),
+            "VJ912": ("Low", "Meter behind trunk bank"),
+        },
     }
-    risk_by_flight = {
-        "VJ152": "High",
-        "VJ237": "Medium",
-        "VJ205": "Medium",
-        "VJ310": "High",
-        "VJ801": "High",
-    }
+    impact_by_flight = impacts.get(scenario_key, impacts["sgn_typhoon"])
     rows = []
     for flight in data["scheduled_flights"]:
         if flight["flight"] not in impact_by_flight:
             continue
+        risk, impact = impact_by_flight[flight["flight"]]
         rows.append(
             {
                 "Flight": flight["flight"],
@@ -359,8 +380,8 @@ def flight_table(data: dict[str, Any]) -> pd.DataFrame:
                 "Gate/Stand": flight.get("planned_gate") or flight.get("planned_stand"),
                 "Passengers": flight["passengers_booked"],
                 "Priority": flight["priority"],
-                "Risk": risk_by_flight[flight["flight"]],
-                "Ops impact": impact_by_flight[flight["flight"]],
+                "Risk": risk,
+                "Ops impact": impact,
             }
         )
     return pd.DataFrame(rows)
@@ -1070,7 +1091,7 @@ def inject_styles() -> None:
         }
         .cockpit-grid {
             display: grid;
-            grid-template-columns: minmax(260px, 0.84fr) minmax(440px, 1.38fr) minmax(310px, 1.04fr);
+            grid-template-columns: minmax(270px, 0.82fr) minmax(500px, 1.48fr) minmax(430px, 1.2fr);
             gap: 0.85rem;
             align-items: start;
         }
@@ -1231,7 +1252,59 @@ def inject_styles() -> None:
             color: var(--text);
             font-size: 0.84rem;
             line-height: 1.42;
-            white-space: pre-wrap;
+        }
+        .briefing-text h3 {
+            margin: 0.75rem 0 0.35rem;
+            color: var(--text);
+            font-size: 1rem;
+            line-height: 1.22;
+        }
+        .briefing-text h4,
+        .briefing-text h5 {
+            margin: 0.72rem 0 0.28rem;
+            color: var(--text);
+            font-size: 0.9rem;
+            line-height: 1.25;
+        }
+        .briefing-text p {
+            margin: 0 0 0.62rem;
+        }
+        .briefing-text ol,
+        .briefing-text ul {
+            margin: 0.25rem 0 0.75rem 1.15rem;
+            padding: 0;
+        }
+        .briefing-text li {
+            margin-bottom: 0.4rem;
+        }
+        .briefing-text hr {
+            border: 0;
+            border-top: 1px solid #e4e9f1;
+            margin: 0.75rem 0;
+        }
+        .briefing-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.55rem 0 0.8rem;
+            font-size: 0.8rem;
+        }
+        .briefing-table th,
+        .briefing-table td {
+            border-bottom: 1px solid #e6ebf2;
+            padding: 0.36rem 0.28rem;
+            text-align: left;
+            vertical-align: top;
+        }
+        .briefing-table th {
+            color: var(--muted);
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .insight-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.85rem;
         }
         .event-list {
             display: grid;
@@ -1374,9 +1447,25 @@ def inject_styles() -> None:
             padding-top: 0;
             border-top: 0;
         }
+        @media (max-width: 1280px) {
+            .cockpit-grid {
+                grid-template-columns: minmax(260px, 0.9fr) minmax(460px, 1.35fr);
+            }
+            .why-stack {
+                grid-column: 1 / -1;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .ai-briefing {
+                grid-column: 1 / -1;
+            }
+        }
         @media (max-width: 900px) {
-            .cockpit-grid, .agent-grid {
+            .cockpit-grid, .agent-grid, .insight-grid, .why-stack {
                 grid-template-columns: 1fr;
+            }
+            .why-stack {
+                display: flex;
             }
             .decision-stack {
                 order: 1;
@@ -1575,6 +1664,72 @@ def esc(value: Any) -> str:
     return html.escape(str(value), quote=True)
 
 
+def markdown_to_html(value: str) -> str:
+    lines = value.strip().splitlines()
+    blocks: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index].strip()
+        if not line:
+            index += 1
+            continue
+        if line == "---":
+            blocks.append("<hr>")
+            index += 1
+            continue
+        if line.startswith("|") and index + 1 < len(lines) and set(lines[index + 1].strip()) <= {"|", "-", ":", " "}:
+            headers = [cell.strip() for cell in line.strip("|").split("|")]
+            index += 2
+            rows = []
+            while index < len(lines) and lines[index].strip().startswith("|"):
+                rows.append([cell.strip() for cell in lines[index].strip().strip("|").split("|")])
+                index += 1
+            head_html = "".join(f"<th>{inline_markdown(cell)}</th>" for cell in headers)
+            body_html = "".join(
+                "<tr>" + "".join(f"<td>{inline_markdown(cell)}</td>" for cell in row) + "</tr>"
+                for row in rows
+            )
+            blocks.append(f"<table class=\"briefing-table\"><thead><tr>{head_html}</tr></thead><tbody>{body_html}</tbody></table>")
+            continue
+        if line.startswith("#"):
+            level = min(3, len(line) - len(line.lstrip("#")))
+            text = line[level:].strip()
+            blocks.append(f"<h{level + 2}>{inline_markdown(text)}</h{level + 2}>")
+            index += 1
+            continue
+        if re.match(r"^\d+\.\s+", line):
+            items = []
+            while index < len(lines) and re.match(r"^\d+\.\s+", lines[index].strip()):
+                item = re.sub(r"^\d+\.\s+", "", lines[index].strip())
+                items.append(f"<li>{inline_markdown(item)}</li>")
+                index += 1
+            blocks.append(f"<ol>{''.join(items)}</ol>")
+            continue
+        if line.startswith("- "):
+            items = []
+            while index < len(lines) and lines[index].strip().startswith("- "):
+                items.append(f"<li>{inline_markdown(lines[index].strip()[2:])}</li>")
+                index += 1
+            blocks.append(f"<ul>{''.join(items)}</ul>")
+            continue
+
+        paragraph = [line]
+        index += 1
+        while index < len(lines):
+            candidate = lines[index].strip()
+            if not candidate or candidate == "---" or candidate.startswith("#") or candidate.startswith("|") or re.match(r"^\d+\.\s+", candidate) or candidate.startswith("- "):
+                break
+            paragraph.append(candidate)
+            index += 1
+        blocks.append(f"<p>{inline_markdown(' '.join(paragraph))}</p>")
+    return "".join(blocks)
+
+
+def inline_markdown(value: str) -> str:
+    escaped = esc(value)
+    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+
+
 def risk_pill(value: str) -> str:
     return f'<span class="pill pill-{esc(value.lower())}">{esc(value)}</span>'
 
@@ -1666,19 +1821,12 @@ def weather_panel_details(data: dict[str, Any]) -> dict[str, Any]:
 
 def impact_options(decision: dict[str, Any]) -> list[dict[str, Any]]:
     outcome = decision["projected_outcome"]
-    ai_cost = max(4200, outcome["total_estimated_savings_usd"] - 10500)
-    baseline_misconnects = 41
-    ai_misconnects = max(0, baseline_misconnects - outcome["misconnections_prevented"])
-    return [
-        {
-            "option": "Do nothing",
-            "delay": 138,
-            "misconnects": baseline_misconnects,
-            "cost": ai_cost + outcome["total_estimated_savings_usd"],
-        },
-        {"option": "Delay protected flight", "delay": 96, "misconnects": 17, "cost": ai_cost + 9400},
-        {"option": "AI recommendation", "delay": 42, "misconnects": ai_misconnects, "cost": ai_cost},
-    ]
+    return outcome["impact_comparison"]
+
+
+def impact_extremes(decision: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    options = impact_options(decision)
+    return {"baseline": options[0], "recommended": options[-1]}
 
 
 def agent_consensus_items(decision: dict[str, Any]) -> list[tuple[str, str, str]]:
@@ -1693,6 +1841,43 @@ def agent_consensus_items(decision: dict[str, Any]) -> list[tuple[str, str, str]
         ("maintenance_agent", "Maintenance", "Avoids dispatching aircraft with narrow engineering buffers."),
         ("cost_impact_agent", "Cost", f"Best package: {first}; {second}; {third}."),
     ]
+
+
+def trace_items_for_scenario(data: dict[str, Any], decision: dict[str, Any]) -> list[tuple[str, str, str]]:
+    scenario_key = data["scenario"].get("selected_key", "sgn_typhoon")
+    actions = decision["recommended_actions"]
+    first = action_title(actions[0])
+    scenario_traces = {
+        "sgn_typhoon": [
+            ("weather_agent", "Weather", "High-risk window begins at 08:00; peak SGN disruption at 10:00."),
+            ("aircraft_agent", "Aircraft", "VN-A237 is eligible, at SGN, and matches VJ152 capacity."),
+            ("crew_agent", "Crew", "Reserve crew C-SGN-R12 can cover VJ237 after delay."),
+            ("maintenance_agent", "Maintenance", "VN-A678 stays protected due radar MEL and 09:30 rectification."),
+            ("cost_impact_agent", "Cost", "Protecting VJ152 prevents the largest connection-cost cascade."),
+        ],
+        "sgn_lightning": [
+            ("weather_agent", "Ramp", "Lightning cells make remote-stand service the controlling constraint."),
+            ("aircraft_agent", "Gate", "Gate 18 is reserved for the contact-gate trunk departure."),
+            ("crew_agent", "Crew", "Reserve coverage absorbs a short VJ237 delay after ramp restart."),
+            ("maintenance_agent", "Maintenance", "No extra engineering risk is introduced by holding VJ310."),
+            ("cost_impact_agent", "Cost", f"Best package starts with {first}, avoiding avoidable bus-boarding disruption."),
+        ],
+        "sgn_maintenance": [
+            ("maintenance_agent", "Maintenance", "VN-A152 and VN-A678 both have maintenance-sensitive recovery paths."),
+            ("aircraft_agent", "Aircraft", "The swap avoids sending a constrained tail into a longer rotation."),
+            ("weather_agent", "Weather", "Storm-window dispatch raises the penalty for unresolved MEL items."),
+            ("crew_agent", "Crew", "Crew reassignment keeps legal coverage while engineering releases complete."),
+            ("cost_impact_agent", "Cost", "Avoiding an AOG cascade is worth more than preserving the original sequence."),
+        ],
+        "sgn_network_stress": [
+            ("cost_impact_agent", "Network", "The domestic bank has more demand than reduced SGN capacity can absorb."),
+            ("weather_agent", "ATFM", "Metering keeps the departure queue below collapse threshold."),
+            ("aircraft_agent", "Aircraft", "Protected rotations keep trunk-bank aircraft ahead of lower-yield sectors."),
+            ("crew_agent", "Crew", "Reserve crews are held for delayed departures instead of released early."),
+            ("maintenance_agent", "Maintenance", "Recovery buffers keep afternoon rotations from inheriting morning delays."),
+        ],
+    }
+    return scenario_traces.get(scenario_key, scenario_traces["sgn_typhoon"])
 
 
 def timeline_stage(elapsed_seconds: float) -> dict[str, Any]:
@@ -2544,7 +2729,7 @@ def build_dashboard_html(
                     <div class="risk">{risk:.0%}</div>
                 </div>
                 <div class="bar"><span style="width: {risk * 100:.0f}%"></span></div>
-                <div class="muted">{esc(AGENT_SHORT_SUMMARIES[agent])}</div>
+                <div class="muted">{esc(finding['summary'])}</div>
             </div>
             """
         )
@@ -2558,13 +2743,7 @@ def build_dashboard_html(
         """
         for alternative in decision["alternatives_considered"][:3]
     )
-    trace_items = [
-        ("weather_agent", "Weather", "High-risk window begins at 08:00; peak SGN disruption at 10:00."),
-        ("aircraft_agent", "Aircraft", "VN-A237 is eligible, at SGN, and matches VJ152 capacity."),
-        ("crew_agent", "Crew", "Reserve crew C-SGN-R12 can cover VJ237 after delay."),
-        ("maintenance_agent", "Maintenance", "VN-A678 stays protected due radar MEL and 09:30 rectification."),
-        ("cost_impact_agent", "Cost", "Protecting VJ152 prevents the largest connection-cost cascade."),
-    ]
+    trace_items = trace_items_for_scenario(data, decision)
     trace_html = "".join(
         f"""
         <div class="trace-item">
@@ -2599,6 +2778,9 @@ def build_dashboard_html(
         f"Claude via AWS Bedrock" if llm_enabled else "Fallback briefing"
     )
     llm_badge_class = "ai-badge" if llm_enabled else "ai-badge off"
+    impact_bounds = impact_extremes(decision)
+    baseline_impact = impact_bounds["baseline"]
+    recommended_impact = impact_bounds["recommended"]
 
     return f"""
         <div class="dashboard-shell">
@@ -2667,15 +2849,15 @@ def build_dashboard_html(
                         <div class="before-after">
                             <div class="impact-cell">
                                 <div class="impact-label">Misconnects</div>
-                                <div class="impact-change"><span class="before">41</span><span>&rarr;</span><span class="after">3</span></div>
+                                <div class="impact-change"><span class="before">{esc(baseline_impact['misconnects'])}</span><span>&rarr;</span><span class="after">{esc(recommended_impact['misconnects'])}</span></div>
                             </div>
                             <div class="impact-cell">
                                 <div class="impact-label">Delay Exposure</div>
-                                <div class="impact-change"><span class="before">138 min</span><span>&rarr;</span><span class="after">42 min</span></div>
+                                <div class="impact-change"><span class="before">{esc(baseline_impact['delay'])} min</span><span>&rarr;</span><span class="after">{esc(recommended_impact['delay'])} min</span></div>
                             </div>
                             <div class="impact-cell">
                                 <div class="impact-label">Cost Risk</div>
-                                <div class="impact-change"><span class="before">US$25.9k</span><span>&rarr;</span><span class="after">US$7.7k</span></div>
+                                <div class="impact-change"><span class="before">US${baseline_impact['cost'] / 1000:.1f}k</span><span>&rarr;</span><span class="after">US${recommended_impact['cost'] / 1000:.1f}k</span></div>
                             </div>
                         </div>
                     </div>
@@ -2722,14 +2904,14 @@ def build_dashboard_html(
                             <h2>LLM Ops Briefing</h2>
                             <span class="{llm_badge_class}">{esc(llm_badge)}</span>
                         </div>
-                        <div class="briefing-text">{esc(llm_briefing['text'])}</div>
+                        <div class="briefing-text">{markdown_to_html(llm_briefing['text'])}</div>
                     </div>
                     <div class="card ops-brief">
                         <div class="ai-head">
                             <h2>Duty Manager Brief</h2>
                             <span class="ai-badge off">Copy-ready</span>
                         </div>
-                        <div class="briefing-text">{esc(ops_brief)}</div>
+                        <div class="briefing-text"><p>{esc(ops_brief)}</p></div>
                     </div>
                     <div class="card">
                         <h2>Ops Manager asks: Why?</h2>
@@ -2740,10 +2922,6 @@ def build_dashboard_html(
                         <h2>Agent Consensus</h2>
                         <div class="trace-list">{consensus_html}</div>
                     </div>
-                    <div class="card">
-                        <h2>Decision Trace</h2>
-                        <div class="trace-list">{trace_html}</div>
-                    </div>
                 </div>
             </div>
 
@@ -2751,9 +2929,15 @@ def build_dashboard_html(
                 <h2>Specialist Agents</h2>
                 <div class="agent-grid">{''.join(agent_html)}</div>
             </div>
-            <div class="card">
-                <h2>Rejected Alternatives</h2>
-                <div class="alternatives-list">{alternatives_html}</div>
+            <div class="insight-grid">
+                <div class="card">
+                    <h2>Rejected Alternatives</h2>
+                    <div class="alternatives-list">{alternatives_html}</div>
+                </div>
+                <div class="card">
+                    <h2>Decision Trace</h2>
+                    <div class="trace-list">{trace_html}</div>
+                </div>
             </div>
         </div>
         """

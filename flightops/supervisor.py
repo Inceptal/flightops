@@ -41,12 +41,14 @@ class SupervisorAgent:
         reserve_crew = crew_signals["reserve_crew_id"]
         protect_flight = cost_signals["protect_flight"]
 
+        scenario_key = data.get("scenario", {}).get("selected_key", "sgn_typhoon")
         confidence = self._confidence(findings)
-        savings = self._estimate_savings(cost_signals, protect_flight)
-        misconnections_prevented = self._estimate_misconnections_prevented(cost_signals, protect_flight)
+        impact_profile = self._impact_profile(scenario_key)
+        savings = impact_profile["savings"]
+        misconnections_prevented = impact_profile["misconnections_prevented"]
         actions = self._scenario_actions(
             data=data,
-            scenario_key=data.get("scenario", {}).get("selected_key", "sgn_typhoon"),
+            scenario_key=scenario_key,
             protect_flight=protect_flight,
             recommended_tail=recommended_tail,
             original_tail=original_tail,
@@ -62,16 +64,17 @@ class SupervisorAgent:
             "recommended_actions": actions,
             "projected_outcome": {
                 "total_estimated_savings_usd": savings,
-                "delay_minutes_avoided": 96,
+                "delay_minutes_avoided": impact_profile["delay_minutes_avoided"],
                 "misconnections_prevented": misconnections_prevented,
-                "protected_passengers": 269,
+                "protected_passengers": impact_profile["protected_passengers"],
+                "impact_comparison": impact_profile["impact_comparison"],
                 "residual_risk": (
                     "If SGN capacity falls below "
                     f"{weather_signals['min_arrival_capacity_per_hour']} movements/hour earlier than forecast, "
                     "the protected flight may still receive CTOT delay."
                 ),
             },
-            "alternatives_considered": self._alternatives(data, signals),
+            "alternatives_considered": self._alternatives(data, signals, scenario_key),
             "agent_findings": [finding.to_dict() for finding in findings],
             "explainability_payload": self._explain(
                 data,
@@ -83,6 +86,55 @@ class SupervisorAgent:
             ),
         }
         return decision
+
+    def _impact_profile(self, scenario_key: str) -> dict[str, Any]:
+        profiles = {
+            "sgn_typhoon": {
+                "savings": 18200,
+                "delay_minutes_avoided": 96,
+                "misconnections_prevented": 38,
+                "protected_passengers": 269,
+                "impact_comparison": [
+                    {"option": "Do nothing", "delay": 138, "misconnects": 41, "cost": 25900},
+                    {"option": "Delay protected flight", "delay": 96, "misconnects": 17, "cost": 17100},
+                    {"option": "AI recommendation", "delay": 42, "misconnects": 3, "cost": 7700},
+                ],
+            },
+            "sgn_lightning": {
+                "savings": 14500,
+                "delay_minutes_avoided": 72,
+                "misconnections_prevented": 18,
+                "protected_passengers": 228,
+                "impact_comparison": [
+                    {"option": "Keep remote boarding", "delay": 104, "misconnects": 24, "cost": 22100},
+                    {"option": "Hold all departures", "delay": 64, "misconnects": 11, "cost": 12600},
+                    {"option": "AI recommendation", "delay": 32, "misconnects": 6, "cost": 7600},
+                ],
+            },
+            "sgn_maintenance": {
+                "savings": 22100,
+                "delay_minutes_avoided": 118,
+                "misconnections_prevented": 9,
+                "protected_passengers": 196,
+                "impact_comparison": [
+                    {"option": "Dispatch constrained tail", "delay": 176, "misconnects": 16, "cost": 33800},
+                    {"option": "Keep original rotation", "delay": 121, "misconnects": 12, "cost": 23400},
+                    {"option": "AI recommendation", "delay": 58, "misconnects": 7, "cost": 11700},
+                ],
+            },
+            "sgn_network_stress": {
+                "savings": 29700,
+                "delay_minutes_avoided": 164,
+                "misconnections_prevented": 51,
+                "protected_passengers": 1030,
+                "impact_comparison": [
+                    {"option": "Let bank self-sort", "delay": 244, "misconnects": 67, "cost": 48600},
+                    {"option": "Meter departures only", "delay": 156, "misconnects": 29, "cost": 28700},
+                    {"option": "AI recommendation", "delay": 80, "misconnects": 16, "cost": 18900},
+                ],
+            },
+        }
+        return profiles.get(scenario_key, profiles["sgn_typhoon"])
 
     def _base_actions(
         self,
@@ -193,9 +245,9 @@ class SupervisorAgent:
                     "priority": 2,
                     "flight": "VJ152",
                     "from_resource": "Gate 14",
-                    "to_resource": "Gate 18",
-                    "reason": "Gate 18 keeps the protected trunk flight on a contact gate and out of remote-stand handling exposure.",
-                    "estimated_turnaround_minutes_saved": 11,
+                    "to_resource": "Gate 16",
+                    "reason": "Gate 16 is the nearest available contact gate outside the remote-stand lightning exposure area.",
+                    "estimated_turnaround_minutes_saved": 8,
                 },
                 {
                     "action_id": "ACT-003",
@@ -256,7 +308,14 @@ class SupervisorAgent:
                     "reason": "Reserve crew absorbs the controlled delay while checked-in crew protects the trunk-bank departure.",
                     "condition": "Execute if VJ237 slips behind the protected HAN departure queue.",
                 },
-                base[2] | {"priority": 4, "action_id": "ACT-004"},
+                base[2] | {
+                    "priority": 4,
+                    "action_id": "ACT-004",
+                    "from_resource": "Gate 18",
+                    "to_resource": "Gate 22",
+                    "reason": "Gate 22 gives the trunk bank a cleaner pushback path while W4 and adjacent contact gates are compressed.",
+                    "estimated_turnaround_minutes_saved": 7,
+                },
                 base[4] | {"priority": 5, "action_id": "ACT-005"},
                 {
                     "action_id": "ACT-006",
@@ -331,9 +390,63 @@ class SupervisorAgent:
         protected = next(item for item in cost_signals["ranked_flights"] if item["flight"] == protect_flight)
         return max(0, protected["connection_passengers"] - 3)
 
-    def _alternatives(self, data: dict[str, Any], signals: dict[str, Any]) -> list[dict[str, Any]]:
+    def _alternatives(self, data: dict[str, Any], signals: dict[str, Any], scenario_key: str) -> list[dict[str, Any]]:
         aircraft_scores = signals["aircraft_agent"]["candidate_scores"]
         a678 = next(item for item in aircraft_scores if item["tail"] == "VN-A678")
+        if scenario_key == "sgn_lightning":
+            return [
+                {
+                    "option": "Keep remote boarding active",
+                    "score": 0.36,
+                    "rejected_because": "Remote stand R32 is exposed to lightning ramp-stop bursts and bus boarding would strand passengers.",
+                },
+                {
+                    "option": "Move VJ310 to Gate 18",
+                    "score": 0.52,
+                    "rejected_because": "Gate 18 is better used protecting VJ152's trunk connections during the ramp-stop window.",
+                },
+                {
+                    "option": "Hold the whole morning bank",
+                    "score": 0.58,
+                    "rejected_because": "A blanket hold reduces ramp risk but creates avoidable delay for contact-gate departures.",
+                },
+            ]
+        if scenario_key == "sgn_maintenance":
+            return [
+                {
+                    "option": "Dispatch VN-A678 before rectification",
+                    "score": 0.33,
+                    "rejected_because": "Weather-radar and pack-control defects make storm-window dispatch the highest maintenance risk.",
+                },
+                {
+                    "option": "Keep VN-A152 on the original rotation",
+                    "score": 0.49,
+                    "rejected_because": "The aircraft would return too close to its accelerated SGN maintenance requirement.",
+                },
+                {
+                    "option": "Swap to any available A320",
+                    "score": 0.57,
+                    "rejected_because": "The generic swap ignores seat count, A-check timing, and engineering release windows.",
+                },
+            ]
+        if scenario_key == "sgn_network_stress":
+            return [
+                {
+                    "option": "First-come, first-served release",
+                    "score": 0.31,
+                    "rejected_because": "It lets low-yield short-haul flights consume scarce departure slots ahead of trunk-bank connections.",
+                },
+                {
+                    "option": "Meter departures without passenger protection",
+                    "score": 0.55,
+                    "rejected_because": "Metering alone leaves 13 connection groups exposed at HAN, DAD and CXR.",
+                },
+                {
+                    "option": "Protect every delayed connection group",
+                    "score": 0.61,
+                    "rejected_because": "Full protection over-uses service capacity; the AI package targets the highest-risk groups first.",
+                },
+            ]
         return [
             {
                 "option": "Do nothing",
