@@ -27,22 +27,23 @@ git push -u origin main
 - [x] Add `requirements.txt`
 - [x] Create first local commit
 
-## Phase 2: Demo UI
+## Phase 2: Decision Cockpit UI
 
-- [ ] Build operations dashboard layout
-- [ ] Add live disruption timeline
-- [ ] Add weather risk panel
-- [ ] Add NOTAM and airport-capacity panel
-- [ ] Add flight wave table with delay-risk coloring
-- [ ] Add aircraft/crew/maintenance detail drawers
-- [ ] Add supervisor recommendation panel
-- [ ] Add rejected alternatives panel
-- [ ] Add "Why?" explanation chain
+- [x] Build focused decision-cockpit layout
+- [x] Add scenario header for typhoon risk near SGN
+- [x] Add four core metrics
+- [x] Add weather, NOTAM and airport-capacity risk panel
+- [x] Add affected flight table with risk coloring
+- [x] Add supervisor recommendation panel
+- [x] Add compact specialist-agent reasoning cards
+- [x] Add rejected alternatives panel
+- [x] Add "Why?" explanation chain
+- [ ] Review the dashboard live with the team and cut anything that slows the demo
 
 Commit target:
 
 ```bash
-git commit -m "Build operations dashboard demo"
+git commit -m "Build decision cockpit dashboard"
 ```
 
 ## Phase 3: Agent Simulation
