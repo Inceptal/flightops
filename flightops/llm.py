@@ -97,10 +97,12 @@ class LLMExplanationAgent:
     def _fallback(self, evidence_bundle: dict[str, Any], error: str | None = None) -> LLMBriefing:
         actions = evidence_bundle["recommended_actions"]
         metrics = evidence_bundle["metrics"]
+        scenario = evidence_bundle["scenario"]["name"]
         text = (
-            f"FlightOps AI recommends: {actions[0]}; {actions[1]}; {actions[2]}. "
-            f"The recommendation protects VJ152 before the SGN weather-risk window, shifts lower-cost "
-            f"delay to VJ237, and uses Gate 18 to reduce turnaround risk. Estimated savings are "
+            f"For {scenario}, FlightOps AI recommends: {actions[0]}; {actions[1]}; {actions[2]}. "
+            "The recommendation is based on the coordinated weather, aircraft, crew, maintenance and cost "
+            "agent findings, prioritizing the action sequence with the lowest modeled disruption cascade. "
+            "Estimated savings are "
             f"{metrics['estimated_savings']}, with {metrics['misconnections_prevented']} misconnections "
             "prevented. Residual risk remains if SGN flow control tightens earlier than forecast."
         )
@@ -122,6 +124,14 @@ class LLMExplanationAgent:
                 recommended_actions.append(f"Delay {action['flight']} by {action['delay_minutes']} minutes")
             elif action["type"] == "gate_change":
                 recommended_actions.append(f"Move {action['flight']} to {action['to_resource']}")
+            elif action["type"] == "ground_hold":
+                recommended_actions.append(f"Hold {action['flight']} for {action['hold_minutes']} minutes")
+            elif action["type"] == "maintenance_protection":
+                recommended_actions.append(f"Protect {action['tail']} for maintenance")
+            elif action["type"] == "crew_reallocation":
+                recommended_actions.append(f"Reassign {action['flight']} to {action['to_crew']}")
+            elif action["type"] == "capacity_rebalance":
+                recommended_actions.append(f"Prioritize {action['flight_bank']}")
 
         return {
             "scenario": {

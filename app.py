@@ -1177,9 +1177,24 @@ def build_dashboard_html(
         elif action["type"] == "controlled_delay":
             title = f"Delay {action['flight']} by {action['delay_minutes']} min"
             dot_class = " delay"
-        else:
+        elif action["type"] == "gate_change":
             title = f"Move {action['flight']} to {action['to_resource']}"
             dot_class = " gate"
+        elif action["type"] == "ground_hold":
+            title = f"Hold {action['flight']} for {action['hold_minutes']} min"
+            dot_class = " delay"
+        elif action["type"] == "maintenance_protection":
+            title = f"Protect {action['tail']} for maintenance"
+            dot_class = " delay"
+        elif action["type"] == "crew_reallocation":
+            title = f"Reassign {action['flight']} to {action['to_crew']}"
+            dot_class = " gate"
+        elif action["type"] == "capacity_rebalance":
+            title = f"Prioritize {action['flight_bank']}"
+            dot_class = ""
+        else:
+            title = action["type"].replace("_", " ").title()
+            dot_class = ""
         action_html.append(
             f"""
             <div class="action-row">
