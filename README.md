@@ -28,6 +28,13 @@ streamlit run app.py
 
 The first demo dataset is in `demo-data/flightops-ai-typhoon-sgn-2026-07-12.json`.
 
+### Assets
+
+The VietJet Air logo in `assets/vietjet-air-logo.svg` is sourced from Wikimedia Commons:
+https://commons.wikimedia.org/wiki/File:VietJet_Air_logo.svg
+
+The file is marked as a public-domain textlogo on Commons, but it remains a trademark of VietJet Air.
+
 ### Run Agent Orchestration Directly
 
 ```bash

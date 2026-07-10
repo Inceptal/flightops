@@ -18,3 +18,4 @@ Thumbs.db
 
 .streamlit/secrets.toml
 .codex/
+tmp/

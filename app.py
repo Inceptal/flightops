@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import html
 import json
+import base64
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +13,7 @@ from flightops.supervisor import SupervisorAgent
 
 
 DATA_PATH = Path("demo-data/flightops-ai-typhoon-sgn-2026-07-12.json")
+LOGO_PATH = Path("assets/vietjet-air-logo.svg")
 AGENT_LABELS = {
     "weather_agent": "Weather",
     "aircraft_agent": "Aircraft",
@@ -25,6 +28,27 @@ AGENT_BADGES = {
     "maintenance_agent": "MX",
     "cost_impact_agent": "$",
 }
+AGENT_ACCENTS = {
+    "weather_agent": "red",
+    "aircraft_agent": "blue",
+    "crew_agent": "purple",
+    "maintenance_agent": "amber",
+    "cost_impact_agent": "green",
+}
+AGENT_ICONS = {
+    "weather_agent": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 18H8.2a4.7 4.7 0 0 1-.7-9.35A6.1 6.1 0 0 1 19 11.2 3.45 3.45 0 0 1 17.5 18Z"/><path d="m13 13-2 4h3l-2 4"/></svg>',
+    "aircraft_agent": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 21 4l-7.5 18-3-7.5L3 11.5Z"/><path d="m10.5 14.5 3-3"/></svg>',
+    "crew_agent": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-8 0"/><path d="M5 21a7 7 0 0 1 14 0"/><path d="M17 7a3 3 0 0 1 3 3"/><path d="M20 21a5 5 0 0 0-3-4.6"/></svg>',
+    "maintenance_agent": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 6.3 3-3 3 3-3 3"/><path d="M17.7 9.3 9 18l-3 1 1-3 8.7-8.7"/><path d="m4 4 5 5"/></svg>',
+    "cost_impact_agent": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M17 7.5c0-1.7-2.2-3-5-3s-5 1.3-5 3 2.2 3 5 3 5 1.3 5 3-2.2 3-5 3-5-1.3-5-3"/></svg>',
+}
+AGENT_SHORT_SUMMARIES = {
+    "weather_agent": "SGN capacity drops after 08:00; peak disruption at 10:00.",
+    "aircraft_agent": "VN-A237 is the best aircraft swap for VJ152.",
+    "crew_agent": "Reserve crew can absorb VJ237 after the controlled delay.",
+    "maintenance_agent": "Hold VN-A678 due weather-radar MEL and rectification slot.",
+    "cost_impact_agent": "VJ152 has the highest disruption and connection cost.",
+}
 
 
 @st.cache_data
@@ -36,6 +60,13 @@ def load_demo_data() -> dict[str, Any]:
 @st.cache_data
 def run_agents(data: dict[str, Any]) -> dict[str, Any]:
     return SupervisorAgent().decide(data)
+
+
+@st.cache_data
+def load_logo_data_uri() -> str:
+    logo_bytes = LOGO_PATH.read_bytes()
+    encoded = base64.b64encode(logo_bytes).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
 
 
 def flight_table(data: dict[str, Any]) -> pd.DataFrame:
@@ -111,13 +142,18 @@ def inject_styles() -> None:
             background: var(--bg);
             color: var(--text);
         }
+        header[data-testid="stHeader"],
+        #MainMenu,
+        footer {
+            display: none;
+        }
         div[data-testid="stVerticalBlock"] {
             gap: 0.75rem;
         }
         .block-container {
-            padding-top: 1.25rem;
+            padding-top: 0.75rem;
             padding-bottom: 1.25rem;
-            max-width: 1420px;
+            max-width: 1480px;
         }
         .topbar {
             display: flex;
@@ -136,15 +172,22 @@ def inject_styles() -> None:
             gap: 0.7rem;
         }
         .brand-mark {
-            width: 38px;
-            height: 38px;
-            display: grid;
-            place-items: center;
+            width: 145px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             border-radius: 8px;
-            background: #d71920;
-            color: #fff;
-            font-weight: 800;
-            letter-spacing: 0;
+            border: 1px solid #f0c8c8;
+            background: #ffffff;
+            padding: 0.35rem 0.45rem;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+        }
+        .brand-mark img {
+            display: block;
+            max-width: 100%;
+            max-height: 34px;
+            object-fit: contain;
         }
         .brand h1 {
             font-size: 1.35rem;
@@ -174,11 +217,12 @@ def inject_styles() -> None:
             border: 1px solid var(--panel-border);
             border-radius: 8px;
             background: var(--panel);
-            padding: 1rem;
+            padding: 0.95rem;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+            min-width: 0;
         }
         .card h2, .card h3 {
-            margin: 0 0 0.7rem;
+            margin: 0 0 0.62rem;
             letter-spacing: 0;
         }
         .card h2 {
@@ -189,20 +233,21 @@ def inject_styles() -> None:
         }
         .muted {
             color: var(--muted);
-            font-size: 0.88rem;
-            line-height: 1.45;
+            font-size: 0.84rem;
+            line-height: 1.4;
+            overflow-wrap: break-word;
         }
         .metric-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.65rem;
+            gap: 0.55rem;
         }
         .metric-tile {
             border: 1px solid #e2e7ef;
             border-radius: 8px;
             background: #fbfcfe;
-            padding: 0.78rem;
-            min-height: 84px;
+            padding: 0.72rem;
+            min-height: 76px;
         }
         .metric-label {
             color: var(--muted);
@@ -213,21 +258,47 @@ def inject_styles() -> None:
         }
         .metric-value {
             color: var(--text);
-            font-size: 1.45rem;
+            font-size: 1.35rem;
             font-weight: 800;
-            margin-top: 0.22rem;
+            margin-top: 0.16rem;
             letter-spacing: 0;
         }
         .recommendation {
             border-color: #bfe7d5;
+            border-left: 5px solid var(--green);
             background: linear-gradient(180deg, #ffffff 0%, #f5fff9 100%);
+        }
+        .rec-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.15rem;
+        }
+        .rec-head h2 {
+            margin: 0;
+        }
+        .recommended-label {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.55rem;
+            border-radius: 999px;
+            background: #eafaf2;
+            color: #126044;
+            font-size: 0.74rem;
+            font-weight: 900;
+            white-space: nowrap;
         }
         .action-row {
             display: grid;
             grid-template-columns: 2rem 1fr;
-            gap: 0.7rem;
-            padding: 0.72rem 0;
+            gap: 0.68rem;
+            padding: 0.68rem 0;
             border-top: 1px solid #dceee5;
+            min-width: 0;
+        }
+        .action-row > div {
+            min-width: 0;
         }
         .action-row:first-of-type {
             border-top: 0;
@@ -244,31 +315,95 @@ def inject_styles() -> None:
             font-size: 0.78rem;
             font-weight: 800;
         }
+        .step-dot.delay {
+            background: #b76800;
+        }
+        .step-dot.gate {
+            background: #2663b8;
+        }
         .action-title {
-            font-size: 1rem;
+            font-size: 0.98rem;
             font-weight: 800;
             margin: 0;
             letter-spacing: 0;
+            overflow-wrap: break-word;
         }
         .action-reason {
             margin: 0.18rem 0 0;
             color: var(--muted);
-            font-size: 0.86rem;
-            line-height: 1.4;
+            font-size: 0.82rem;
+            line-height: 1.34;
+            overflow-wrap: break-word;
+        }
+        .before-after {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.62rem;
+            padding-top: 0.62rem;
+            border-top: 1px solid #dceee5;
+        }
+        .impact-cell {
+            border: 1px solid #dbe8e2;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.78);
+            padding: 0.52rem;
+        }
+        .impact-label {
+            color: var(--muted);
+            font-size: 0.68rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            margin-bottom: 0.2rem;
+        }
+        .impact-change {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.94rem;
+            font-weight: 900;
+        }
+        .before {
+            color: #9f1218;
+        }
+        .after {
+            color: #126044;
         }
         .agent-card {
             border: 1px solid #dfe5ee;
             border-radius: 8px;
             background: #ffffff;
-            padding: 0.78rem;
-            min-height: 142px;
+            padding: 0.72rem;
+            min-height: 118px;
+            border-top: 4px solid #dfe5ee;
+        }
+        .agent-card.red {
+            border-top-color: #d71920;
+            background: linear-gradient(180deg, #ffffff 0%, #fff8f8 100%);
+        }
+        .agent-card.blue {
+            border-top-color: #2663b8;
+            background: linear-gradient(180deg, #ffffff 0%, #f6faff 100%);
+        }
+        .agent-card.purple {
+            border-top-color: #7c55c7;
+            background: linear-gradient(180deg, #ffffff 0%, #faf7ff 100%);
+        }
+        .agent-card.amber {
+            border-top-color: #b76800;
+            background: linear-gradient(180deg, #ffffff 0%, #fffaf0 100%);
+        }
+        .agent-card.green {
+            border-top-color: #14845b;
+            background: linear-gradient(180deg, #ffffff 0%, #f5fff9 100%);
         }
         .agent-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 0.75rem;
-            margin-bottom: 0.45rem;
+            margin-bottom: 0.34rem;
         }
         .agent-label {
             display: flex;
@@ -287,6 +422,45 @@ def inject_styles() -> None:
             font-size: 0.72rem;
             font-weight: 900;
         }
+        .icon-badge {
+            display: grid;
+            place-items: center;
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 7px;
+            background: #eef2f7;
+            color: var(--slate);
+            flex: 0 0 auto;
+        }
+        .icon-badge svg {
+            width: 1.05rem;
+            height: 1.05rem;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .icon-badge.red {
+            background: #fff1f1;
+            color: #9f1218;
+        }
+        .icon-badge.blue {
+            background: #edf5ff;
+            color: #235aa6;
+        }
+        .icon-badge.purple {
+            background: #f4efff;
+            color: #6842a6;
+        }
+        .icon-badge.amber {
+            background: #fff7df;
+            color: #765000;
+        }
+        .icon-badge.green {
+            background: #eafaf2;
+            color: #126044;
+        }
         .risk {
             color: var(--amber);
             font-size: 0.78rem;
@@ -297,18 +471,30 @@ def inject_styles() -> None:
             background: #e8edf4;
             border-radius: 999px;
             overflow: hidden;
-            margin: 0.45rem 0 0.55rem;
+            margin: 0.36rem 0 0.45rem;
         }
         .bar span {
             display: block;
             height: 100%;
             background: linear-gradient(90deg, #ffc400 0%, #d71920 100%);
         }
+        .agent-card.blue .bar span {
+            background: linear-gradient(90deg, #6bb7ff 0%, #2663b8 100%);
+        }
+        .agent-card.purple .bar span {
+            background: linear-gradient(90deg, #c9b6ff 0%, #7c55c7 100%);
+        }
+        .agent-card.amber .bar span {
+            background: linear-gradient(90deg, #ffd166 0%, #b76800 100%);
+        }
+        .agent-card.green .bar span {
+            background: linear-gradient(90deg, #63d99c 0%, #14845b 100%);
+        }
         .why-step {
             display: grid;
             grid-template-columns: 1.8rem 1fr;
-            gap: 0.65rem;
-            padding: 0.65rem 0;
+            gap: 0.62rem;
+            padding: 0.58rem 0;
             border-top: 1px solid #e3e8f0;
         }
         .why-step:first-of-type {
@@ -326,16 +512,36 @@ def inject_styles() -> None:
             font-size: 0.78rem;
             font-weight: 900;
         }
+        .why-num.red {
+            background: #fff1f1;
+            color: #9f1218;
+        }
+        .why-num.blue {
+            background: #edf5ff;
+            color: #235aa6;
+        }
+        .why-num.purple {
+            background: #f4efff;
+            color: #6842a6;
+        }
+        .why-num.green {
+            background: #eafaf2;
+            color: #126044;
+        }
+        .why-num.amber {
+            background: #fff7df;
+            color: #765000;
+        }
         .why-title {
             font-weight: 800;
             margin: 0;
-            font-size: 0.9rem;
+            font-size: 0.86rem;
         }
         .why-impact {
             margin: 0.16rem 0 0;
             color: var(--muted);
-            font-size: 0.83rem;
-            line-height: 1.4;
+            font-size: 0.8rem;
+            line-height: 1.32;
         }
         .weather-strip {
             display: flex;
@@ -345,7 +551,7 @@ def inject_styles() -> None:
         .weather-hour {
             flex: 1;
             border-radius: 6px;
-            padding: 0.48rem 0.35rem;
+            padding: 0.44rem 0.3rem;
             text-align: center;
             background: #f1f5f9;
             color: #334155;
@@ -400,13 +606,159 @@ def inject_styles() -> None:
             margin: 0;
             font-size: 1.05rem;
         }
+        .dashboard-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            min-width: 0;
+            overflow-x: hidden;
+        }
+        .cockpit-grid {
+            display: grid;
+            grid-template-columns: minmax(260px, 0.84fr) minmax(440px, 1.38fr) minmax(310px, 1.04fr);
+            gap: 0.85rem;
+            align-items: start;
+        }
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            min-width: 0;
+        }
+        .impact-stack {
+            order: 1;
+        }
+        .decision-stack {
+            order: 2;
+        }
+        .why-stack {
+            order: 3;
+        }
+        .flight-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.84rem;
+        }
+        .flight-table th {
+            color: var(--muted);
+            font-size: 0.72rem;
+            text-align: left;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            padding: 0.55rem 0.45rem;
+            border-bottom: 1px solid #e4e9f1;
+            white-space: nowrap;
+        }
+        .flight-table td {
+            padding: 0.63rem 0.45rem;
+            border-bottom: 1px solid #edf1f5;
+            vertical-align: top;
+        }
+        .flight-table tr:last-child td {
+            border-bottom: 0;
+        }
+        .flight-id {
+            font-weight: 900;
+            color: var(--text);
+        }
+        .table-scroll {
+            overflow-x: auto;
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+        }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 0.18rem 0.46rem;
+            font-size: 0.72rem;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+        .pill-high {
+            background: #fff1f1;
+            color: #9f1218;
+        }
+        .pill-medium {
+            background: #fff7df;
+            color: #765000;
+        }
+        .pill-low {
+            background: #edfdf5;
+            color: #126044;
+        }
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 0.7rem;
+        }
+        .alternatives-list {
+            display: grid;
+            gap: 0.55rem;
+            margin-top: 0.15rem;
+        }
+        .alternative {
+            border-top: 1px solid #e4e9f1;
+            padding-top: 0.55rem;
+        }
+        .alternative:first-child {
+            border-top: 0;
+            padding-top: 0;
+        }
+        .alternative-title {
+            margin: 0;
+            font-size: 0.86rem;
+            font-weight: 900;
+        }
+        .alternative-reason {
+            margin: 0.12rem 0 0;
+            color: var(--muted);
+            font-size: 0.78rem;
+            line-height: 1.35;
+        }
+        .trace-list {
+            display: grid;
+            gap: 0.52rem;
+        }
+        .trace-item {
+            display: grid;
+            grid-template-columns: 1.85rem 1fr;
+            gap: 0.55rem;
+            align-items: start;
+            padding-top: 0.52rem;
+            border-top: 1px solid #e4e9f1;
+        }
+        .trace-item:first-child {
+            padding-top: 0;
+            border-top: 0;
+        }
+        .trace-title {
+            margin: 0;
+            font-size: 0.84rem;
+            font-weight: 900;
+        }
+        .trace-detail {
+            margin: 0.08rem 0 0;
+            color: var(--muted);
+            font-size: 0.78rem;
+            line-height: 1.3;
+        }
         @media (max-width: 900px) {
-            div[data-testid="stHorizontalBlock"] {
-                flex-wrap: wrap;
+            .cockpit-grid, .agent-grid {
+                grid-template-columns: 1fr;
             }
-            div[data-testid="column"] {
-                width: 100% !important;
-                flex: 1 1 100% !important;
+            .decision-stack {
+                order: 1;
+            }
+            .impact-stack {
+                order: 2;
+            }
+            .why-stack {
+                order: 3;
+            }
+            .block-container {
+                padding-left: 0.7rem;
+                padding-right: 0.7rem;
             }
             .topbar {
                 align-items: flex-start;
@@ -417,6 +769,12 @@ def inject_styles() -> None:
             }
             .metric-value {
                 font-size: 1.2rem;
+            }
+            .before-after {
+                grid-template-columns: 1fr;
+            }
+            .flight-table {
+                min-width: 640px;
             }
         }
         </style>
@@ -566,6 +924,255 @@ def render_alternatives(decision: dict[str, Any]) -> None:
             st.caption(alternative["rejected_because"])
 
 
+def esc(value: Any) -> str:
+    return html.escape(str(value), quote=True)
+
+
+def risk_pill(value: str) -> str:
+    return f'<span class="pill pill-{esc(value.lower())}">{esc(value)}</span>'
+
+
+def build_dashboard_html(data: dict[str, Any], decision: dict[str, Any]) -> str:
+    snapshot = data["scenario"]["snapshot_time_local"]
+    outcome = decision["projected_outcome"]
+    payload = decision["explainability_payload"]
+    logo_src = load_logo_data_uri()
+
+    metrics = [
+        ("Confidence", f"{decision['confidence']:.0%}"),
+        ("Savings", f"US${outcome['total_estimated_savings_usd']:,}"),
+        ("Delay avoided", f"{outcome['delay_minutes_avoided']} min"),
+        ("Misconnections prevented", outcome["misconnections_prevented"]),
+    ]
+    metric_html = "".join(
+        f"""
+        <div class="metric-tile">
+            <div class="metric-label">{esc(label)}</div>
+            <div class="metric-value">{esc(value)}</div>
+        </div>
+        """
+        for label, value in metrics
+    )
+
+    forecast = data["weather_feed"]["airport_forecasts"][0]["hourly_risk"]
+    weather_html = "".join(
+        f"""
+        <div class="weather-hour {'hot' if item['delay_risk_score'] >= 0.75 else 'warn' if item['delay_risk_score'] >= 0.55 else ''}">
+            {esc(item['local_time'])}<br>{item['delay_risk_score']:.0%}
+        </div>
+        """
+        for item in forecast
+    )
+
+    action_html = []
+    for action in decision["recommended_actions"][:3]:
+        if action["type"] == "aircraft_swap":
+            title = f"Swap {action['flight']} onto {action['to_tail']}"
+            dot_class = ""
+        elif action["type"] == "controlled_delay":
+            title = f"Delay {action['flight']} by {action['delay_minutes']} min"
+            dot_class = " delay"
+        else:
+            title = f"Move {action['flight']} to {action['to_resource']}"
+            dot_class = " gate"
+        action_html.append(
+            f"""
+            <div class="action-row">
+                <div class="step-dot{dot_class}">{action['priority']}</div>
+                <div>
+                    <p class="action-title">{esc(title)}</p>
+                    <p class="action-reason">{esc(action['reason'])}</p>
+                </div>
+            </div>
+            """
+        )
+
+    flight_rows = []
+    for row in flight_table(data).to_dict("records"):
+        flight_rows.append(
+            f"""
+            <tr>
+                <td><span class="flight-id">{esc(row['Flight'])}</span></td>
+                <td>{esc(row['Route'])}</td>
+                <td>{esc(row['STD'])}</td>
+                <td>{esc(row['Aircraft'])}</td>
+                <td>{esc(row['Gate/Stand'])}</td>
+                <td>{esc(row['Passengers'])}</td>
+                <td>{risk_pill(row['Risk'])}</td>
+                <td>{esc(row['Ops impact'])}</td>
+            </tr>
+            """
+        )
+
+    why_html = []
+    why_colors = ["red", "green", "blue", "purple", "amber"]
+    for step in payload["decision_chain"]:
+        color = why_colors[(step["step"] - 1) % len(why_colors)]
+        why_html.append(
+            f"""
+            <div class="why-step">
+                <div class="why-num {color}">{esc(step['step'])}</div>
+                <div>
+                    <p class="why-title">{esc(step['finding'])}</p>
+                    <p class="why-impact">{esc(step['impact'])}</p>
+                </div>
+            </div>
+            """
+        )
+
+    agent_html = []
+    for finding in decision["agent_findings"]:
+        agent = finding["agent"]
+        risk = finding["risk_score"]
+        accent = AGENT_ACCENTS[agent]
+        agent_html.append(
+            f"""
+            <div class="agent-card {accent}">
+                <div class="agent-head">
+                    <div class="agent-label"><span class="icon-badge {accent}">{AGENT_ICONS[agent]}</span>{esc(AGENT_LABELS[agent])}</div>
+                    <div class="risk">{risk:.0%}</div>
+                </div>
+                <div class="bar"><span style="width: {risk * 100:.0f}%"></span></div>
+                <div class="muted">{esc(AGENT_SHORT_SUMMARIES[agent])}</div>
+            </div>
+            """
+        )
+
+    alternatives_html = "".join(
+        f"""
+        <div class="alternative">
+            <p class="alternative-title">{esc(alternative['option'])}</p>
+            <p class="alternative-reason">{esc(alternative['rejected_because'])}</p>
+        </div>
+        """
+        for alternative in decision["alternatives_considered"][:3]
+    )
+    trace_items = [
+        ("weather_agent", "Weather", "High-risk window begins at 08:00; peak SGN disruption at 10:00."),
+        ("aircraft_agent", "Aircraft", "VN-A237 is eligible, at SGN, and matches VJ152 capacity."),
+        ("crew_agent", "Crew", "Reserve crew C-SGN-R12 can cover VJ237 after delay."),
+        ("maintenance_agent", "Maintenance", "VN-A678 stays protected due radar MEL and 09:30 rectification."),
+        ("cost_impact_agent", "Cost", "Protecting VJ152 prevents the largest connection-cost cascade."),
+    ]
+    trace_html = "".join(
+        f"""
+        <div class="trace-item">
+            <span class="icon-badge {AGENT_ACCENTS[agent]}">{AGENT_ICONS[agent]}</span>
+            <div>
+                <p class="trace-title">{esc(title)}</p>
+                <p class="trace-detail">{esc(detail)}</p>
+            </div>
+        </div>
+        """
+        for agent, title, detail in trace_items
+    )
+
+    return f"""
+        <div class="dashboard-shell">
+            <div class="topbar">
+                <div class="brand">
+                    <div class="brand-mark">
+                        <img src="{logo_src}" alt="VietJet Air logo">
+                    </div>
+                    <div>
+                        <h1>FlightOps AI</h1>
+                        <p>Autonomous operations copilot for disruption management</p>
+                    </div>
+                </div>
+                <div>
+                    <div class="status-pill">Typhoon risk near SGN</div>
+                    <p class="status-sub">Snapshot {esc(snapshot[11:16])} ICT | 6-hour planning horizon</p>
+                </div>
+            </div>
+
+            <div class="cockpit-grid">
+                <div class="stack impact-stack">
+                    <div class="card">
+                        <h2>Scenario Impact</h2>
+                        <div class="metric-grid">{metric_html}</div>
+                    </div>
+                    <div class="card">
+                        <h2>Weather And NOTAM Risk</h2>
+                        <div class="muted">SGN capacity drops sharply from 08:00 as thunderstorm, windshear and flow-control risk build.</div>
+                        <div class="weather-strip">{weather_html}</div>
+                        <div class="flight-note">Active constraints: ATFM flow management, lightning ramp-stop risk, taxiway W4 closure.</div>
+                    </div>
+                </div>
+
+                <div class="stack decision-stack">
+                    <div class="card recommendation">
+                        <div class="rec-head">
+                            <h2>Supervisor Recommendation</h2>
+                            <span class="recommended-label">Recommended</span>
+                        </div>
+                        {''.join(action_html)}
+                        <div class="before-after">
+                            <div class="impact-cell">
+                                <div class="impact-label">Misconnects</div>
+                                <div class="impact-change"><span class="before">41</span><span>&rarr;</span><span class="after">3</span></div>
+                            </div>
+                            <div class="impact-cell">
+                                <div class="impact-label">Delay Exposure</div>
+                                <div class="impact-change"><span class="before">138 min</span><span>&rarr;</span><span class="after">42 min</span></div>
+                            </div>
+                            <div class="impact-cell">
+                                <div class="impact-label">Cost Risk</div>
+                                <div class="impact-change"><span class="before">US$25.9k</span><span>&rarr;</span><span class="after">US$7.7k</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h2>Affected Flights</h2>
+                        <div class="table-scroll">
+                            <table class="flight-table">
+                                <thead>
+                                    <tr>
+                                        <th>Flight</th>
+                                        <th>Route</th>
+                                        <th>STD</th>
+                                        <th>Aircraft</th>
+                                        <th>Gate</th>
+                                        <th>Pax</th>
+                                        <th>Risk</th>
+                                        <th>Ops Impact</th>
+                                    </tr>
+                                </thead>
+                                <tbody>{''.join(flight_rows)}</tbody>
+                            </table>
+                        </div>
+                        <div class="flight-note">Focused morning wave for the 2-3 minute demo.</div>
+                    </div>
+                </div>
+
+                <div class="stack why-stack">
+                    <div class="card">
+                        <h2>Ops Manager asks: Why?</h2>
+                        <div class="muted">{esc(payload['short_answer'])}</div>
+                        {''.join(why_html)}
+                    </div>
+                    <div class="card">
+                        <h2>Decision Trace</h2>
+                        <div class="trace-list">{trace_html}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Specialist Agents</h2>
+                <div class="agent-grid">{''.join(agent_html)}</div>
+            </div>
+            <div class="card">
+                <h2>Rejected Alternatives</h2>
+                <div class="alternatives-list">{alternatives_html}</div>
+            </div>
+        </div>
+        """
+
+
+def render_dashboard(data: dict[str, Any], decision: dict[str, Any]) -> None:
+    st.markdown(build_dashboard_html(data, decision), unsafe_allow_html=True)
+
+
 def main() -> None:
     st.set_page_config(
         page_title="FlightOps AI",
@@ -576,33 +1183,7 @@ def main() -> None:
     data = load_demo_data()
     decision = run_agents(data)
     inject_styles()
-    render_topbar(data)
-
-    left_col, center_col, right_col = st.columns([1.0, 1.45, 1.1], gap="medium")
-    with left_col:
-        render_metrics(decision)
-        render_weather_snapshot(data)
-
-    with center_col:
-        render_recommendation(decision)
-        st.markdown('<div class="section-title"><h2>Affected Flights</h2></div>', unsafe_allow_html=True)
-        flights = flight_table(data)
-        st.dataframe(
-            style_flight_table(flights),
-            use_container_width=True,
-            hide_index=True,
-            height=220,
-        )
-        st.markdown(
-            '<div class="table-note">Focused morning wave for the 2-3 minute demo.</div>',
-            unsafe_allow_html=True,
-        )
-
-    with right_col:
-        render_why(decision)
-        render_alternatives(decision)
-
-    render_agents(decision)
+    render_dashboard(data, decision)
 
 
 if __name__ == "__main__":
