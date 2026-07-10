@@ -319,7 +319,7 @@ def run_agents(data: dict[str, Any]) -> dict[str, Any]:
     return SupervisorAgent().decide(data)
 
 
-@st.cache_data
+@st.cache_data(ttl=60 * 60 * 24, max_entries=32, show_spinner=False)
 def run_llm_briefing(data: dict[str, Any], decision: dict[str, Any]) -> dict[str, Any]:
     return LLMExplanationAgent().run(data, decision).to_dict()
 
