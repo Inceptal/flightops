@@ -2083,6 +2083,15 @@ let activeIndex = -1;
 const money = (value) => "US$" + value.toLocaleString();
 const byId = (id) => document.getElementById(id);
 
+function clockFor(second) {{
+    const startMinutes = 5 * 60 + 40;
+    const simulatedMinutes = Math.floor(Math.max(0, Math.min(duration, second)) / duration * 12 * 60);
+    const total = startMinutes + simulatedMinutes;
+    const hours = Math.floor(total / 60) % 24;
+    const minutes = total % 60;
+    return String(hours).padStart(2, "0") + ":" + String(minutes).padStart(2, "0");
+}}
+
 function stageFor(second) {{
     let current = DATA.snapshots[0];
     for (const snapshot of DATA.snapshots) {{
@@ -2117,9 +2126,10 @@ function render(second) {{
     byId("progress").style.width = Math.round(elapsed / duration * 100) + "%";
     byId("playBtn").textContent = running ? "Running" : (elapsed > 0 && elapsed < duration ? "Resume" : "Start");
     setText("status", snapshot.status);
-    setText("scope", "Snapshot " + snapshot.clock + " ICT | " + snapshot.dataScope);
+    const liveClock = clockFor(elapsed);
+    setText("scope", "Snapshot " + liveClock + " ICT | " + snapshot.dataScope);
     setText("activeEvent", snapshot.event);
-    setText("clock", snapshot.clock + " ICT");
+    setText("clock", liveClock + " ICT");
     setText("acceptedCount", snapshot.acceptedCount);
     setText("flightsRecovered", snapshot.flightsRecovered);
     setText("cumulativeSavings", money(snapshot.cumulativeSavings));
