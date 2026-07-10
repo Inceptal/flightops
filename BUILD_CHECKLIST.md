@@ -25,7 +25,7 @@ git push -u origin main
 - [x] Add Python web frontend scaffold
 - [x] Add `.gitignore`
 - [x] Add `requirements.txt`
-- [ ] Create first local commit
+- [x] Create first local commit
 
 ## Phase 2: Demo UI
 
@@ -47,11 +47,11 @@ git commit -m "Build operations dashboard demo"
 
 ## Phase 3: Agent Simulation
 
-- [ ] Create agent modules for weather, aircraft, crew, maintenance and cost
-- [ ] Create supervisor orchestration module
-- [ ] Have each agent return structured findings
-- [ ] Have supervisor rank alternatives
-- [ ] Feed the UI from generated agent output instead of static JSON fields
+- [x] Create agent modules for weather, aircraft, crew, maintenance and cost
+- [x] Create supervisor orchestration module
+- [x] Have each agent return structured findings
+- [x] Have supervisor rank alternatives
+- [x] Feed the UI from generated agent output instead of static JSON fields
 
 Commit target:
 

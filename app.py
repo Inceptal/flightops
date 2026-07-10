@@ -7,6 +7,8 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from flightops.supervisor import SupervisorAgent
+
 
 DATA_PATH = Path("demo-data/flightops-ai-typhoon-sgn-2026-07-12.json")
 
@@ -15,6 +17,11 @@ DATA_PATH = Path("demo-data/flightops-ai-typhoon-sgn-2026-07-12.json")
 def load_demo_data() -> dict[str, Any]:
     with DATA_PATH.open("r", encoding="utf-8") as file:
         return json.load(file)
+
+
+@st.cache_data
+def run_agents(data: dict[str, Any]) -> dict[str, Any]:
+    return SupervisorAgent().decide(data)
 
 
 def flight_table(data: dict[str, Any]) -> pd.DataFrame:
@@ -43,7 +50,7 @@ def main() -> None:
     )
 
     data = load_demo_data()
-    decision = data["supervisor_decision"]
+    decision = run_agents(data)
     outcome = decision["projected_outcome"]
 
     st.title("FlightOps AI")
@@ -62,7 +69,7 @@ def main() -> None:
     st.dataframe(flight_table(data), use_container_width=True, hide_index=True)
 
     st.subheader("Specialist Agent Findings")
-    for finding in data["agent_findings"]:
+    for finding in decision["agent_findings"]:
         with st.expander(finding["agent"].replace("_", " ").title(), expanded=True):
             st.write(finding["summary"])
             st.progress(finding["risk_score"])
@@ -70,10 +77,13 @@ def main() -> None:
             for evidence in finding["evidence"]:
                 st.markdown(f"- {evidence}")
 
-    st.subheader('Ops Manager Asks: "Why?"')
-    st.write(data["explainability_payload"]["short_answer"])
+            with st.popover("Signals"):
+                st.json(finding["signals"])
 
-    for step in data["explainability_payload"]["decision_chain"]:
+    st.subheader('Ops Manager Asks: "Why?"')
+    st.write(decision["explainability_payload"]["short_answer"])
+
+    for step in decision["explainability_payload"]["decision_chain"]:
         st.markdown(f"**{step['step']}. {step['finding']}**")
         st.write(step["impact"])
 
