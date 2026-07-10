@@ -104,6 +104,15 @@ def apply_maintenance_scenario(data: dict[str, Any]) -> None:
     data["scenario"]["name"] = "Maintenance cascade at SGN"
     data["scenario"]["status_label"] = "Maintenance cascade at SGN"
     data["scenario"]["summary"] = "Weather disruption combines with two narrow-body maintenance constraints."
+    data["weather_feed"]["storm"]["name"] = "SGN Heat And Convective Recovery Window"
+    data["weather_feed"]["storm"]["classification"] = "maintenance-sensitive convective recovery"
+    for item in data["weather_feed"]["airport_forecasts"][0]["hourly_risk"]:
+        if item["local_time"] in {"08:00", "09:00", "10:00"}:
+            item["main_driver"] = "wet ramp, peak heat and engineering release buffers"
+        if item["local_time"] == "10:00":
+            item["delay_risk_score"] = max(item["delay_risk_score"], 0.88)
+    data["notams"][0]["text"] = "DUE WX AND MAINTENANCE RECOVERY CONSTRAINTS, EXPECT CTOT SENSITIVITY FOR LATE ENGINEERING RELEASES."
+    data["notams"][0]["ops_impact"] = "Narrow-body rotations with maintenance return limits should avoid long ground holds."
     data["fleet"][0]["next_maintenance"]["due_local"] = "2026-07-12T13:20:00+07:00"
     data["fleet"][0]["next_maintenance"]["due_in_flight_hours"] = 4.3
     data["maintenance_logs"].append(
@@ -130,6 +139,12 @@ def apply_network_stress_scenario(data: dict[str, Any]) -> None:
     data["scenario"]["name"] = "High-volume SGN network stress"
     data["scenario"]["status_label"] = "High-volume network stress"
     data["scenario"]["summary"] = "Large morning bank with many monitored flights, crews, aircraft and passenger flows."
+    data["weather_feed"]["storm"]["name"] = "SGN Capacity Compression Window"
+    data["weather_feed"]["storm"]["classification"] = "network-wide flow restriction"
+    data["notams"][0]["text"] = "NETWORK GDP ACTIVE. SGN DOMESTIC DEPARTURE METERING REQUIRED DURING MORNING BANK."
+    data["notams"][0]["ops_impact"] = "Departure release rate capped; trunk-bank flights should be prioritized."
+    data["notams"][2]["text"] = "GATE AND TAXIWAY COMPRESSION EXPECTED DUE HIGH-VOLUME BANK AND TWY W4 CLOSURE."
+    data["notams"][2]["ops_impact"] = "Gate conflicts and taxi-out queues likely unless rotations are metered."
     routes = ["SGN-HAN", "SGN-DAD", "SGN-CXR", "SGN-PQC", "SGN-HUI", "SGN-HPH", "SGN-VCA", "SGN-BMV"]
     tails = []
     for index in range(18):
@@ -207,6 +222,7 @@ def apply_network_stress_scenario(data: dict[str, Any]) -> None:
     for item in data["weather_feed"]["airport_forecasts"][0]["hourly_risk"]:
         item["arrival_capacity_per_hour"] = max(6, item["arrival_capacity_per_hour"] - 2)
         item["departure_capacity_per_hour"] = max(8, item["departure_capacity_per_hour"] - 3)
+        item["main_driver"] = "reduced SGN capacity and high-volume departure bank"
 
 
 @st.cache_data
@@ -779,6 +795,55 @@ def inject_styles() -> None:
             font-size: 0.8rem;
             margin-top: 0.5rem;
         }
+        .weather-meta {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.65rem;
+        }
+        .weather-meta-item {
+            border: 1px solid #e2e7ef;
+            border-radius: 8px;
+            background: #fbfcfe;
+            padding: 0.52rem;
+        }
+        .weather-meta-label {
+            color: var(--muted);
+            font-size: 0.66rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .weather-meta-value {
+            color: var(--text);
+            font-size: 0.8rem;
+            font-weight: 900;
+            margin-top: 0.08rem;
+            line-height: 1.25;
+        }
+        .constraint-list {
+            display: grid;
+            gap: 0.38rem;
+            margin-top: 0.62rem;
+        }
+        .constraint-item {
+            border-left: 3px solid var(--amber);
+            background: #fffaf0;
+            border-radius: 6px;
+            padding: 0.42rem 0.5rem;
+        }
+        .constraint-title {
+            margin: 0;
+            color: var(--text);
+            font-size: 0.76rem;
+            font-weight: 900;
+        }
+        .constraint-impact {
+            margin: 0.08rem 0 0;
+            color: var(--muted);
+            font-size: 0.72rem;
+            line-height: 1.25;
+        }
         .section-title {
             border: 1px solid var(--panel-border);
             border-radius: 8px 8px 0 0;
@@ -1182,6 +1247,9 @@ def inject_styles() -> None:
             .comparison-table {
                 min-width: 430px;
             }
+            .weather-meta {
+                grid-template-columns: 1fr;
+            }
         }
         </style>
         """,
@@ -1395,6 +1463,29 @@ def monitor_events(data: dict[str, Any], decision: dict[str, Any]) -> list[tuple
     ]
 
 
+def weather_panel_details(data: dict[str, Any]) -> dict[str, Any]:
+    forecast = data["weather_feed"]["airport_forecasts"][0]["hourly_risk"]
+    peak = max(forecast, key=lambda item: item["delay_risk_score"])
+    min_departure_capacity = min(item["departure_capacity_per_hour"] for item in forecast)
+    min_arrival_capacity = min(item["arrival_capacity_per_hour"] for item in forecast)
+    notams = data.get("notams", [])[:3]
+    return {
+        "storm_name": data["weather_feed"]["storm"]["name"],
+        "classification": data["weather_feed"]["storm"]["classification"],
+        "peak_time": peak["local_time"],
+        "peak_risk": f"{peak['delay_risk_score']:.0%}",
+        "peak_driver": peak["main_driver"],
+        "capacity": f"{min_departure_capacity} dep/hr | {min_arrival_capacity} arr/hr",
+        "constraints": [
+            {
+                "title": f"{notam['category']} {notam['id']}",
+                "impact": notam["ops_impact"],
+            }
+            for notam in notams
+        ],
+    }
+
+
 def impact_options(decision: dict[str, Any]) -> list[dict[str, Any]]:
     outcome = decision["projected_outcome"]
     ai_cost = max(4200, outcome["total_estimated_savings_usd"] - 10500)
@@ -1462,6 +1553,7 @@ def build_dashboard_html(
     )
 
     forecast = data["weather_feed"]["airport_forecasts"][0]["hourly_risk"]
+    weather_details = weather_panel_details(data)
     weather_html = "".join(
         f"""
         <div class="weather-hour {'hot' if item['delay_risk_score'] >= 0.75 else 'warn' if item['delay_risk_score'] >= 0.55 else ''}">
@@ -1469,6 +1561,15 @@ def build_dashboard_html(
         </div>
         """
         for item in forecast
+    )
+    constraint_html = "".join(
+        f"""
+        <div class="constraint-item">
+            <p class="constraint-title">{esc(item['title'])}</p>
+            <p class="constraint-impact">{esc(item['impact'])}</p>
+        </div>
+        """
+        for item in weather_details["constraints"]
     )
 
     primary_actions = decision["recommended_actions"][:3]
@@ -1681,7 +1782,25 @@ def build_dashboard_html(
                         <h2>Weather And NOTAM Risk</h2>
                         <div class="muted">{esc(scenario_summary)}</div>
                         <div class="weather-strip">{weather_html}</div>
-                        <div class="flight-note">Active constraints: ATFM flow management, lightning ramp-stop risk, taxiway W4 closure.</div>
+                        <div class="weather-meta">
+                            <div class="weather-meta-item">
+                                <div class="weather-meta-label">Weather System</div>
+                                <div class="weather-meta-value">{esc(weather_details['storm_name'])}</div>
+                            </div>
+                            <div class="weather-meta-item">
+                                <div class="weather-meta-label">Peak Risk</div>
+                                <div class="weather-meta-value">{esc(weather_details['peak_time'])} | {esc(weather_details['peak_risk'])}</div>
+                            </div>
+                            <div class="weather-meta-item">
+                                <div class="weather-meta-label">Capacity Floor</div>
+                                <div class="weather-meta-value">{esc(weather_details['capacity'])}</div>
+                            </div>
+                            <div class="weather-meta-item">
+                                <div class="weather-meta-label">Main Driver</div>
+                                <div class="weather-meta-value">{esc(weather_details['peak_driver'])}</div>
+                            </div>
+                        </div>
+                        <div class="constraint-list">{constraint_html}</div>
                     </div>
                     <div class="card monitor-card">
                         <h2>Autonomous Monitor</h2>

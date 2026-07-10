@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from app import SCENARIO_OPTIONS, impact_options, load_scenario, run_agents
+from app import SCENARIO_OPTIONS, impact_options, load_scenario, run_agents, weather_panel_details
 
 
 class ScenarioVariantTests(unittest.TestCase):
@@ -48,6 +48,18 @@ class ScenarioVariantTests(unittest.TestCase):
         ai_row = next(item for item in impact_options(decision) if item["option"] == "AI recommendation")
         self.assertEqual(ai_row["misconnects"], 3)
         self.assertEqual(decision["projected_outcome"]["misconnections_prevented"], 38)
+
+    def test_weather_panel_details_are_scenario_specific(self) -> None:
+        details = {
+            scenario_key: weather_panel_details(load_scenario(scenario_key))
+            for scenario_key in SCENARIO_OPTIONS
+        }
+        storm_names = {item["storm_name"] for item in details.values()}
+        peak_drivers = {item["peak_driver"] for item in details.values()}
+        self.assertGreaterEqual(len(storm_names), 4)
+        self.assertGreaterEqual(len(peak_drivers), 3)
+        self.assertIn("SGN Capacity Compression Window", storm_names)
+        self.assertIn("SGN Heat And Convective Recovery Window", storm_names)
 
 
 if __name__ == "__main__":
