@@ -4,6 +4,8 @@ import copy
 import html
 import json
 import base64
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +61,67 @@ AGENT_SHORT_SUMMARIES = {
     "maintenance_agent": "Hold VN-A678 due weather-radar MEL and rectification slot.",
     "cost_impact_agent": "VJ152 has the highest disruption and connection cost.",
 }
+TIMELINE_DEMO_SECONDS = 60
+TIMELINE_SIMULATED_HOURS = 12
+TIMELINE_START_LOCAL = "2026-07-12T05:40:00+07:00"
+TIMELINE_MILESTONES = [
+    {
+        "second": 0,
+        "scenario": "sgn_typhoon",
+        "event": "Weather Agent opens typhoon disruption watch for SGN morning bank.",
+        "accepted": "Baseline monitoring started",
+        "cumulative_savings": 0,
+        "flights_recovered": 0,
+    },
+    {
+        "second": 8,
+        "scenario": "sgn_typhoon",
+        "event": "Supervisor package accepted: protect VJ152, delay VJ237, move VJ152 to Gate 18.",
+        "accepted": "VJ152 swap package",
+        "cumulative_savings": 18200,
+        "flights_recovered": 3,
+    },
+    {
+        "second": 16,
+        "scenario": "sgn_lightning",
+        "event": "Lightning ramp-stop warning received; remote-stand handling paused in bursts.",
+        "accepted": "VJ310 ground hold",
+        "cumulative_savings": 32700,
+        "flights_recovered": 7,
+    },
+    {
+        "second": 25,
+        "scenario": "sgn_maintenance",
+        "event": "Maintenance Agent flags VN-A152 return limit and VN-A678 storm-window dispatch risk.",
+        "accepted": "Maintenance protection package",
+        "cumulative_savings": 54800,
+        "flights_recovered": 12,
+    },
+    {
+        "second": 36,
+        "scenario": "sgn_network_stress",
+        "event": "High-volume bank detected: 43 flights competing for reduced SGN capacity.",
+        "accepted": "Network metering package",
+        "cumulative_savings": 81900,
+        "flights_recovered": 24,
+    },
+    {
+        "second": 48,
+        "scenario": "sgn_network_stress",
+        "event": "Passenger protection actions accepted for 13 connection groups across HAN, DAD and CXR.",
+        "accepted": "Passenger protection package",
+        "cumulative_savings": 111600,
+        "flights_recovered": 34,
+    },
+    {
+        "second": 60,
+        "scenario": "sgn_typhoon",
+        "event": "12-hour run complete: afternoon recovery buffers absorbed residual disruption.",
+        "accepted": "Recovery complete",
+        "cumulative_savings": 126400,
+        "flights_recovered": 41,
+    },
+]
 
 
 @st.cache_data
@@ -883,6 +946,104 @@ def inject_styles() -> None:
             min-width: 0;
             overflow-x: hidden;
         }
+        .timeline-card {
+            border: 1px solid #c8daf4;
+            border-left: 5px solid var(--blue);
+            border-radius: 8px;
+            background: linear-gradient(180deg, #ffffff 0%, #f6faff 100%);
+            padding: 0.9rem;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+        }
+        .timeline-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.8rem;
+            margin-bottom: 0.65rem;
+        }
+        .timeline-title {
+            margin: 0;
+            font-size: 1.02rem;
+            font-weight: 900;
+        }
+        .timeline-sub {
+            margin: 0.12rem 0 0;
+            color: var(--muted);
+            font-size: 0.78rem;
+        }
+        .timeline-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.3rem 0.58rem;
+            border-radius: 999px;
+            background: #edf5ff;
+            color: #235aa6;
+            font-size: 0.74rem;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+        .timeline-progress {
+            height: 0.55rem;
+            border-radius: 999px;
+            background: #e7eef8;
+            overflow: hidden;
+        }
+        .timeline-progress span {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #2663b8 0%, #14845b 100%);
+        }
+        .timeline-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.55rem;
+            margin-top: 0.65rem;
+        }
+        .timeline-metric {
+            border: 1px solid #d8e5f6;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.78);
+            padding: 0.55rem;
+        }
+        .timeline-label {
+            color: var(--muted);
+            font-size: 0.66rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .timeline-value {
+            color: var(--text);
+            font-size: 0.96rem;
+            font-weight: 900;
+            margin-top: 0.08rem;
+        }
+        .timeline-events {
+            display: grid;
+            gap: 0.36rem;
+            margin-top: 0.65rem;
+        }
+        .timeline-event {
+            display: grid;
+            grid-template-columns: 3.1rem 1fr;
+            gap: 0.52rem;
+            align-items: start;
+            border-top: 1px solid #d8e5f6;
+            padding-top: 0.4rem;
+            color: var(--muted);
+            font-size: 0.76rem;
+            line-height: 1.28;
+        }
+        .timeline-event:first-child {
+            border-top: 0;
+            padding-top: 0;
+        }
+        .timeline-event-time {
+            color: var(--text);
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+        }
         .cockpit-grid {
             display: grid;
             grid-template-columns: minmax(260px, 0.84fr) minmax(440px, 1.38fr) minmax(310px, 1.04fr);
@@ -1213,6 +1374,13 @@ def inject_styles() -> None:
             .metric-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
+            .timeline-head {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+            .timeline-metrics {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
             .metric-value {
                 font-size: 1.2rem;
             }
@@ -1503,6 +1671,84 @@ def agent_consensus_items(decision: dict[str, Any]) -> list[tuple[str, str, str]
     ]
 
 
+def timeline_stage(elapsed_seconds: float) -> dict[str, Any]:
+    stage = TIMELINE_MILESTONES[0]
+    for milestone in TIMELINE_MILESTONES:
+        if elapsed_seconds >= milestone["second"]:
+            stage = milestone
+        else:
+            break
+    return stage
+
+
+def timeline_event_log(elapsed_seconds: float) -> list[dict[str, Any]]:
+    return [
+        milestone
+        for milestone in TIMELINE_MILESTONES
+        if milestone["second"] <= elapsed_seconds
+    ]
+
+
+def timeline_clock(elapsed_seconds: float) -> str:
+    simulated_minutes = int(
+        min(elapsed_seconds, TIMELINE_DEMO_SECONDS)
+        / TIMELINE_DEMO_SECONDS
+        * TIMELINE_SIMULATED_HOURS
+        * 60
+    )
+    current = datetime.fromisoformat(TIMELINE_START_LOCAL) + timedelta(minutes=simulated_minutes)
+    return current.isoformat()
+
+
+def initialize_timeline_state() -> None:
+    if "timeline_elapsed" not in st.session_state:
+        st.session_state.timeline_elapsed = 0.0
+    if "timeline_running" not in st.session_state:
+        st.session_state.timeline_running = False
+    if "timeline_last_tick" not in st.session_state:
+        st.session_state.timeline_last_tick = time.time()
+
+
+def update_timeline_elapsed() -> None:
+    initialize_timeline_state()
+    now = time.time()
+    if st.session_state.timeline_running:
+        delta = now - st.session_state.timeline_last_tick
+        st.session_state.timeline_elapsed = min(
+            TIMELINE_DEMO_SECONDS,
+            st.session_state.timeline_elapsed + max(0.0, delta),
+        )
+        if st.session_state.timeline_elapsed >= TIMELINE_DEMO_SECONDS:
+            st.session_state.timeline_running = False
+    st.session_state.timeline_last_tick = now
+
+
+def apply_timeline_overlay(data: dict[str, Any], elapsed_seconds: float) -> dict[str, Any]:
+    stage = timeline_stage(elapsed_seconds)
+    clock = timeline_clock(elapsed_seconds)
+    data["scenario"]["snapshot_time_local"] = clock
+    data["scenario"]["status_label"] = f"Live 12h run | {data['scenario']['status_label']}"
+    data["timeline_demo"] = {
+        "elapsed_seconds": round(elapsed_seconds, 1),
+        "progress": min(1.0, elapsed_seconds / TIMELINE_DEMO_SECONDS),
+        "simulated_hours": round(
+            min(elapsed_seconds, TIMELINE_DEMO_SECONDS)
+            / TIMELINE_DEMO_SECONDS
+            * TIMELINE_SIMULATED_HOURS,
+            1,
+        ),
+        "clock": clock,
+        "active_event": stage["event"],
+        "current_package": stage["accepted"],
+        "cumulative_savings": stage["cumulative_savings"],
+        "flights_recovered": stage["flights_recovered"],
+        "accepted_count": max(0, len(timeline_event_log(elapsed_seconds)) - 1),
+        "events": timeline_event_log(elapsed_seconds),
+        "running": st.session_state.get("timeline_running", False),
+    }
+    return data
+
+
 def build_dashboard_html(
     data: dict[str, Any], decision: dict[str, Any], llm_briefing: dict[str, Any]
 ) -> str:
@@ -1521,6 +1767,49 @@ def build_dashboard_html(
         f"{len(data['crew_rosters'])} crews | "
         f"{len(data['passenger_connections'])} connection groups"
     )
+    timeline = data.get("timeline_demo")
+    timeline_html = ""
+    if timeline:
+        timeline_events_html = "".join(
+            f"""
+            <div class="timeline-event">
+                <div class="timeline-event-time">+{esc(event['second'])}s</div>
+                <div>{esc(event['event'])}</div>
+            </div>
+            """
+            for event in timeline["events"][-4:]
+        )
+        timeline_html = f"""
+            <div class="timeline-card">
+                <div class="timeline-head">
+                    <div>
+                        <p class="timeline-title">12-Hour Autonomous Ops Run</p>
+                        <p class="timeline-sub">{esc(timeline['active_event'])}</p>
+                    </div>
+                    <span class="timeline-pill">{'Running' if timeline['running'] else 'Paused'} | {esc(timeline['simulated_hours'])}h simulated</span>
+                </div>
+                <div class="timeline-progress"><span style="width: {timeline['progress'] * 100:.0f}%"></span></div>
+                <div class="timeline-metrics">
+                    <div class="timeline-metric">
+                        <div class="timeline-label">Sim Clock</div>
+                        <div class="timeline-value">{esc(timeline['clock'][11:16])} ICT</div>
+                    </div>
+                    <div class="timeline-metric">
+                        <div class="timeline-label">Accepted Packages</div>
+                        <div class="timeline-value">{esc(timeline['accepted_count'])}</div>
+                    </div>
+                    <div class="timeline-metric">
+                        <div class="timeline-label">Flights Recovered</div>
+                        <div class="timeline-value">{esc(timeline['flights_recovered'])}</div>
+                    </div>
+                    <div class="timeline-metric">
+                        <div class="timeline-label">Cumulative Savings</div>
+                        <div class="timeline-value">US${timeline['cumulative_savings']:,}</div>
+                    </div>
+                </div>
+                <div class="timeline-events">{timeline_events_html}</div>
+            </div>
+        """
 
     metrics = [
         ("Confidence", f"{decision['confidence']:.0%}"),
@@ -1757,6 +2046,7 @@ def build_dashboard_html(
                     <p class="status-sub">Snapshot {esc(snapshot[11:16])} ICT | 6-hour horizon | {esc(data_scope)}</p>
                 </div>
             </div>
+            {timeline_html}
 
             <div class="cockpit-grid">
                 <div class="stack impact-stack">
@@ -1912,6 +2202,50 @@ def render_dashboard(
             st.caption(f"LLM fallback reason: {llm_briefing['error']}")
 
 
+def render_timeline_controls() -> None:
+    update_timeline_elapsed()
+    elapsed = st.session_state.timeline_elapsed
+    running = st.session_state.timeline_running
+    cols = st.columns([1, 1, 1, 4])
+    with cols[0]:
+        if st.button("Start", disabled=running and elapsed < TIMELINE_DEMO_SECONDS, use_container_width=True):
+            if elapsed >= TIMELINE_DEMO_SECONDS:
+                st.session_state.timeline_elapsed = 0.0
+            st.session_state.timeline_running = True
+            st.session_state.timeline_last_tick = time.time()
+            st.rerun()
+    with cols[1]:
+        label = "Pause" if running else "Resume"
+        if st.button(label, disabled=elapsed <= 0 or elapsed >= TIMELINE_DEMO_SECONDS, use_container_width=True):
+            st.session_state.timeline_running = not running
+            st.session_state.timeline_last_tick = time.time()
+            st.rerun()
+    with cols[2]:
+        if st.button("Reset", use_container_width=True):
+            st.session_state.timeline_elapsed = 0.0
+            st.session_state.timeline_running = False
+            st.session_state.timeline_last_tick = time.time()
+            st.rerun()
+    with cols[3]:
+        st.caption(
+            "Timeline demo endpoint: 12 simulated hours in 60 seconds. "
+            "Use Start/Pause/Resume while the main dashboard updates below."
+        )
+
+
+def render_timeline_demo() -> None:
+    render_timeline_controls()
+    elapsed = st.session_state.timeline_elapsed
+    stage = timeline_stage(elapsed)
+    data = apply_timeline_overlay(load_scenario(stage["scenario"]), elapsed)
+    decision = run_agents(data)
+    llm_briefing = run_llm_briefing(data, decision)
+    render_dashboard(data, decision, llm_briefing)
+    if st.session_state.timeline_running and elapsed < TIMELINE_DEMO_SECONDS:
+        time.sleep(1)
+        st.rerun()
+
+
 def main() -> None:
     st.set_page_config(
         page_title="FlightOps AI",
@@ -1920,6 +2254,11 @@ def main() -> None:
     )
 
     inject_styles()
+    demo_mode = st.query_params.get("demo")
+    if demo_mode == "timeline":
+        render_timeline_demo()
+        return
+
     selected_scenario = st.selectbox(
         "Scenario",
         options=list(SCENARIO_OPTIONS),
