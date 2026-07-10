@@ -436,7 +436,9 @@ def inject_styles() -> None:
         .block-container {
             padding-top: 0.75rem;
             padding-bottom: 1.25rem;
-            max-width: 1480px;
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+            max-width: none;
         }
         .topbar {
             display: flex;
@@ -1447,7 +1449,7 @@ def inject_styles() -> None:
             padding-top: 0;
             border-top: 0;
         }
-        @media (max-width: 1280px) {
+        @media (max-width: 1180px) {
             .cockpit-grid {
                 grid-template-columns: minmax(260px, 0.9fr) minmax(460px, 1.35fr);
             }
